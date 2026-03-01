@@ -1,0 +1,108 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "hidden": true,
+      "name": "base",
+      "displayName": "Default Config",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_INSTALL_OPTIONS": "--no-print-usage"
+      },
+      "environment": {
+        "PROJECT_SOURCE_DIR": "${fileDir}/../.."
+      },
+      "vendor": {
+        "jetbrains.com/clion": {
+          "toolchain": "Default"
+        }
+      }
+    },
+    {
+      "hidden": true,
+      "name": "Release_base",
+      "displayName": "Release Config",
+      "description": "Release build",
+      "binaryDir": "$env{PROJECT_SOURCE_DIR}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_OVERLAY_TRIPLETS": "$env{PROJECT_SOURCE_DIR}/Meta/CMake/vcpkg/release-triplets"
+      }
+    },
+    {
+      "hidden": true,
+      "name": "Debug_base",
+      "displayName": "Debug Config",
+      "description": "Debug build",
+      "binaryDir": "$env{PROJECT_SOURCE_DIR}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_OVERLAY_TRIPLETS": "$env{PROJECT_SOURCE_DIR}/Meta/CMake/vcpkg/debug-triplets"
+      }
+    },
+    {
+      "hidden": true,
+      "name": "Sanitizer_base",
+      "displayName": "Sanitizer Config",
+      "description": "Sanitizer build",
+      "binaryDir": "$env{PROJECT_SOURCE_DIR}/build/sanitizers",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "ECM_ENABLE_SANITIZERS": "address;undefined;leak",
+        "VCPKG_OVERLAY_TRIPLETS": "$env{PROJECT_SOURCE_DIR}/Meta/CMake/vcpkg/sanitizer-triplets"
+      }
+    },
+    {
+      "hidden": true,
+      "name": "Distribution_base",
+      "displayName": "Distribution Config",
+      "description": "Distribution build with static libraries",
+      "binaryDir": "$env{PROJECT_SOURCE_DIR}/build/distribution",
+      "cacheVariables": {
+        "BUILD_SHARED_LIBS": "OFF",
+        "CMAKE_BUILD_TYPE": "Release",
+        "VCPKG_OVERLAY_TRIPLETS": "$env{PROJECT_SOURCE_DIR}/Meta/CMake/vcpkg/distribution-triplets"
+      }
+    },
+    {
+      "hidden": true,
+      "name": "Fuzzers_base",
+      "displayName": "Fuzzers Config",
+      "description": "Fuzzers build",
+      "binaryDir": "$env{PROJECT_SOURCE_DIR}/build/fuzzers",
+      "cacheVariables": {
+        "BUILD_SHARED_LIBS": "OFF",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_OVERLAY_TRIPLETS": "$env{PROJECT_SOURCE_DIR}/Meta/CMake/vcpkg/distribution-triplets",
+        "ECM_ENABLE_SANITIZERS": "address;fuzzer"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "hidden": true,
+      "name": "base",
+      "targets": [
+        "all"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "hidden": true,
+      "name": "base",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      },
+      "environment": {
+        "PROJECT_SOURCE_DIR": "${fileDir}/../.."
+      }
+    }
+  ]
+}

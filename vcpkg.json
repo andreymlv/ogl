@@ -1,0 +1,26 @@
+{
+  "builtin-baseline": "b2f068faf45a3f04145bec0f52a66526ad590227",
+  "dependencies": [
+    "assimp",
+    "ecm",
+    "entt",
+    "glad",
+    "glm",
+    "miniaudio",
+    "stb",
+    {
+      "name": "glfw3",
+      "features": [
+        "wayland"
+      ]
+    },
+    {
+      "name": "qtbase",
+      "features": [
+        "testlib",
+        "network"
+      ],
+      "default-features": false
+    }
+  ]
+}

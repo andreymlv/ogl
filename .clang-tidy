@@ -1,0 +1,95 @@
+---
+# KDE Frameworks coding style — clang-tidy configuration
+# https://community.kde.org/Policies/Frameworks_Coding_Style
+
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  bugprone-*,
+  -modernize-use-trailing-return-type,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -readability-identifier-length,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-avoid-non-const-global-variables
+
+CheckOptions:
+  # Member variables: m_ prefix (KDE style)
+  - key: readability-identifier-naming.MemberPrefix
+    value: m_
+  - key: readability-identifier-naming.MemberCase
+    value: camelBack
+
+  # Private member variables also m_
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: m_
+  - key: readability-identifier-naming.PrivateMemberCase
+    value: camelBack
+
+  # Static member variables: s_ prefix
+  - key: readability-identifier-naming.StaticMemberPrefix
+    value: s_
+  - key: readability-identifier-naming.StaticMemberCase
+    value: camelBack
+
+  # Local variables: camelCase, no prefix
+  - key: readability-identifier-naming.LocalVariableCase
+    value: camelBack
+
+  # Parameters: camelCase
+  - key: readability-identifier-naming.ParameterCase
+    value: camelBack
+
+  # Functions and methods: camelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.MemberFunctionCase
+    value: camelBack
+
+  # Classes and structs: PascalCase
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+
+  # Namespaces: lowercase
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+
+  # Enums: PascalCase, enum values: PascalCase (Qt convention)
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+
+  # Template parameters: PascalCase
+  - key: readability-identifier-naming.TemplateParameterCase
+    value: CamelCase
+
+  # Constants: camelCase (KDE does not mandate ALL_CAPS)
+  - key: readability-identifier-naming.ConstantCase
+    value: camelBack
+
+  # Modernize: prefer nullptr, override, default member init
+  - key: modernize-use-nullptr.NullMacros
+    value: NULL
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-pass-by-value.IncludeStyle
+    value: llvm
+
+  # Performance
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: ''
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '(engine|games)/.*\.(hpp|h)$'
+
+FormatStyle: file
