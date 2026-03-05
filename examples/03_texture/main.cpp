@@ -18,9 +18,7 @@
 #include <glad/glad.h>
 
 #include <QCoreApplication>
-
-static constexpr const char *kContainerPath = "/home/andreymlv/src/ogl/libraries/engine/autotests/container.jpg";
-static constexpr const char *kFacePath = "/home/andreymlv/src/ogl/libraries/engine/autotests/awesomeface.png";
+#include <QFile>
 
 // ── Shaders ───────────────────────────────────────────────────────────────────
 
@@ -80,10 +78,21 @@ public:
         if (!m_shader.init(kVertSrc, kFragSrc)) {
             return false;
         }
-        if (!m_texture1.init(kContainerPath)) {
+
+        auto loadTexture = [](engine::Texture &tex, const QString &path) {
+            QFile file(path);
+            if (!file.open(QIODevice::ReadOnly)) {
+                return false;
+            }
+            const QByteArray data = file.readAll();
+            return tex.initFromData(reinterpret_cast<const unsigned char *>(data.constData()),
+                                    static_cast<int>(data.size()));
+        };
+
+        if (!loadTexture(m_texture1, QStringLiteral(":/container.jpg"))) {
             return false;
         }
-        if (!m_texture2.init(kFacePath)) {
+        if (!loadTexture(m_texture2, QStringLiteral(":/awesomeface.png"))) {
             return false;
         }
 

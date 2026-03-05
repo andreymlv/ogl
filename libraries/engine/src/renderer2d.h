@@ -37,6 +37,7 @@ public:
     void beginScene(const Camera2D &camera);
     void drawQuad(glm::vec2 position, glm::vec2 size, glm::vec4 color);
     void drawSprite(glm::vec2 position, glm::vec2 size, const Texture &texture);
+    void drawSprite(glm::vec2 position, glm::vec2 size, const Texture &texture, float rotationDegrees);
     void endScene();
 
     int quadCount() const; // number of quads submitted since beginScene()

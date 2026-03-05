@@ -14,6 +14,7 @@
 #include "engine_logging.h"
 
 #include <array>
+#include <cmath>
 #include <vector>
 
 namespace engine
@@ -206,6 +207,9 @@ bool Renderer2D::isValid() const
 
 void Renderer2D::beginScene(const Camera2D &camera)
 {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     d->m_shader.bind();
     d->m_shader.setUniform("uViewProjection", camera.viewProjectionMatrix());
     d->m_vertices.clear();
@@ -224,6 +228,11 @@ void Renderer2D::drawQuad(glm::vec2 position, glm::vec2 size, glm::vec4 color)
 }
 
 void Renderer2D::drawSprite(glm::vec2 position, glm::vec2 size, const Texture &texture)
+{
+    drawSprite(position, size, texture, 0.F);
+}
+
+void Renderer2D::drawSprite(glm::vec2 position, glm::vec2 size, const Texture &texture, float rotationDegrees)
 {
     // Find or assign a texture slot for this texture within the current batch.
     const GLuint texId = texture.id();
@@ -244,10 +253,35 @@ void Renderer2D::drawSprite(glm::vec2 position, glm::vec2 size, const Texture &t
     }
 
     static constexpr glm::vec4 kWhite{1.F, 1.F, 1.F, 1.F};
-    d->m_vertices.push_back({position, kWhite, {0.F, 0.F}, slot});
-    d->m_vertices.push_back({{position.x + size.x, position.y}, kWhite, {1.F, 0.F}, slot});
-    d->m_vertices.push_back({{position.x + size.x, position.y + size.y}, kWhite, {1.F, 1.F}, slot});
-    d->m_vertices.push_back({{position.x, position.y + size.y}, kWhite, {0.F, 1.F}, slot});
+
+    // Compute rotated corner positions around the quad center.
+    const glm::vec2 center = position + size * 0.5F;
+    const glm::vec2 halfSize = size * 0.5F;
+
+    const float rad = glm::radians(rotationDegrees);
+    const float cosA = std::cos(rad);
+    const float sinA = std::sin(rad);
+
+    // Corner offsets from center: BL, BR, TR, TL
+    const glm::vec2 offsets[4] = {
+        {-halfSize.x, -halfSize.y},
+        { halfSize.x, -halfSize.y},
+        { halfSize.x,  halfSize.y},
+        {-halfSize.x,  halfSize.y},
+    };
+
+    glm::vec2 corners[4];
+    for (int i = 0; i < 4; ++i) {
+        corners[i] = center + glm::vec2{
+            offsets[i].x * cosA - offsets[i].y * sinA,
+            offsets[i].x * sinA + offsets[i].y * cosA,
+        };
+    }
+
+    d->m_vertices.push_back({corners[0], kWhite, {0.F, 0.F}, slot});
+    d->m_vertices.push_back({corners[1], kWhite, {1.F, 0.F}, slot});
+    d->m_vertices.push_back({corners[2], kWhite, {1.F, 1.F}, slot});
+    d->m_vertices.push_back({corners[3], kWhite, {0.F, 1.F}, slot});
     ++d->m_quadCount;
 }
 

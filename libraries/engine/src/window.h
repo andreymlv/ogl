@@ -9,6 +9,8 @@ namespace engine
 // Values intentionally match GLFW_KEY_* so no translation table is needed
 // in GlfwWindow, while keeping GLFW out of this header.
 enum class Key {
+    A = 65,
+    Space = 32,
     W = 87,
     S = 83,
     Up = 265,

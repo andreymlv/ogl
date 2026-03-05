@@ -126,4 +126,64 @@ std::unique_ptr<AudioClip> MiniaudioEngine::createSound(std::span<const float> s
     return clip;
 }
 
+std::unique_ptr<AudioClip> MiniaudioEngine::createSoundFromFile(std::string_view path)
+{
+    if (!d->m_valid) {
+        return nullptr;
+    }
+
+    ma_decoder decoder;
+    ma_decoder_config decoderCfg = ma_decoder_config_init(ma_format_f32, 1, 44100);
+    if (ma_decoder_init_file(std::string(path).c_str(), &decoderCfg, &decoder) != MA_SUCCESS) {
+        return nullptr;
+    }
+
+    ma_uint64 frameCount = 0;
+    ma_decoder_get_length_in_pcm_frames(&decoder, &frameCount);
+    if (frameCount == 0) {
+        ma_decoder_uninit(&decoder);
+        return nullptr;
+    }
+
+    std::vector<float> samples(frameCount);
+    ma_uint64 framesRead = 0;
+    ma_decoder_read_pcm_frames(&decoder, samples.data(), frameCount, &framesRead);
+    samples.resize(framesRead);
+
+    const auto sampleRate = static_cast<int>(decoder.outputSampleRate);
+    ma_decoder_uninit(&decoder);
+
+    return createSound(samples, sampleRate);
+}
+
+std::unique_ptr<AudioClip> MiniaudioEngine::createSoundFromData(std::span<const unsigned char> data)
+{
+    if (!d->m_valid) {
+        return nullptr;
+    }
+
+    ma_decoder decoder;
+    ma_decoder_config decoderCfg = ma_decoder_config_init(ma_format_f32, 1, 44100);
+    if (ma_decoder_init_memory(data.data(), data.size(), &decoderCfg, &decoder) != MA_SUCCESS) {
+        return nullptr;
+    }
+
+    ma_uint64 frameCount = 0;
+    ma_decoder_get_length_in_pcm_frames(&decoder, &frameCount);
+    if (frameCount == 0) {
+        ma_decoder_uninit(&decoder);
+        return nullptr;
+    }
+
+    std::vector<float> samples(frameCount);
+    ma_uint64 framesRead = 0;
+    ma_decoder_read_pcm_frames(&decoder, samples.data(), frameCount, &framesRead);
+    samples.resize(framesRead);
+
+    const auto sampleRate = static_cast<int>(decoder.outputSampleRate);
+    ma_decoder_uninit(&decoder);
+
+    return createSound(samples, sampleRate);
+}
+
 } // namespace engine

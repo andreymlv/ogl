@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-22.04
             name: Linux
           - os: windows-latest
             name: Windows
@@ -86,6 +86,7 @@ jobs:
           cmake --preset Distribution
           -DCMAKE_C_COMPILER=clang-${LLVM_VERSION}
           -DCMAKE_CXX_COMPILER=clang++-${LLVM_VERSION}
+          -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'

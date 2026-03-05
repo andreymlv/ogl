@@ -58,6 +58,7 @@ void Scene::onRender(Renderer2D &renderer, const Camera2D &camera)
         glm::vec2 scale;
         glm::vec4 color;
         std::shared_ptr<Texture> texture;
+        float rotation;
         int zOrder;
     };
 
@@ -66,7 +67,7 @@ void Scene::onRender(Renderer2D &renderer, const Camera2D &camera)
     for (auto e : view) {
         const auto &tf = view.get<Transform>(e);
         const auto &sp = view.get<Sprite>(e);
-        calls.push_back({tf.position, tf.scale, sp.color, sp.texture, sp.zOrder});
+        calls.push_back({tf.position, tf.scale, sp.color, sp.texture, tf.rotation, sp.zOrder});
     }
 
     std::ranges::sort(calls, [](const DrawCall &a, const DrawCall &b) {
@@ -75,7 +76,7 @@ void Scene::onRender(Renderer2D &renderer, const Camera2D &camera)
 
     for (const auto &call : calls) {
         if (call.texture) {
-            renderer.drawSprite(call.position, call.scale, *call.texture);
+            renderer.drawSprite(call.position, call.scale, *call.texture, call.rotation);
         } else {
             renderer.drawQuad(call.position, call.scale, call.color);
         }

@@ -30,6 +30,9 @@ public:
     // Returns false if the file cannot be read or GL upload fails.
     bool init(std::string_view path);
 
+    // Loads from an in-memory image buffer (PNG, JPG, etc.).
+    bool initFromData(const unsigned char *data, int size);
+
     bool isValid() const;
 
     int width() const;

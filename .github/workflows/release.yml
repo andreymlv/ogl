@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-22.04
             name: Linux
             artifact: ogl-linux-x64.tar.gz
           - os: windows-latest
@@ -90,6 +90,7 @@ jobs:
           cmake --preset Distribution
           -DCMAKE_C_COMPILER=clang-${LLVM_VERSION}
           -DCMAKE_CXX_COMPILER=clang++-${LLVM_VERSION}
+          -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
@@ -121,8 +122,6 @@ jobs:
           cp build/distribution/bin/example_01_window ogl-linux-x64/
           cp build/distribution/bin/example_02_triangle ogl-linux-x64/
           cp build/distribution/bin/example_03_texture ogl-linux-x64/
-          cp -r games/flappybird/audio ogl-linux-x64/
-          cp -r games/flappybird/sprites ogl-linux-x64/
           tar -czf ogl-linux-x64.tar.gz ogl-linux-x64
 
       - name: Package (Windows)
@@ -135,8 +134,6 @@ jobs:
           Copy-Item build/distribution/bin/example_01_window.exe ogl-windows-x64/
           Copy-Item build/distribution/bin/example_02_triangle.exe ogl-windows-x64/
           Copy-Item build/distribution/bin/example_03_texture.exe ogl-windows-x64/
-          Copy-Item -Recurse games/flappybird/audio ogl-windows-x64/
-          Copy-Item -Recurse games/flappybird/sprites ogl-windows-x64/
           Compress-Archive -Path ogl-windows-x64 -DestinationPath ogl-windows-x64.zip
 
       - uses: actions/upload-artifact@v4
@@ -223,8 +220,6 @@ jobs:
           cp build/distribution/bin/example_01_window ogl-linux-musl-x64/
           cp build/distribution/bin/example_02_triangle ogl-linux-musl-x64/
           cp build/distribution/bin/example_03_texture ogl-linux-musl-x64/
-          cp -r games/flappybird/audio ogl-linux-musl-x64/
-          cp -r games/flappybird/sprites ogl-linux-musl-x64/
           tar -czf ogl-linux-musl-x64.tar.gz ogl-linux-musl-x64
 
       - uses: actions/upload-artifact@v4
