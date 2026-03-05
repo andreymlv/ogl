@@ -132,6 +132,7 @@ jobs:
 
     env:
       PROJECT_SOURCE_DIR: ${{ github.workspace }}
+      VCPKG_FORCE_SYSTEM_BINARIES: 1
 
     steps:
       - name: Install system dependencies
@@ -165,6 +166,7 @@ jobs:
           cmake --preset Distribution
           -DCMAKE_C_COMPILER=clang
           -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja
           -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
           -DBUILD_TESTING=OFF
 
