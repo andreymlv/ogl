@@ -96,11 +96,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           mkdir -p staging
-          cp build/distribution/games/pong/pong staging/
-          cp build/distribution/games/flappybird/flappybird staging/
-          cp build/distribution/examples/01_window/example_01_window staging/
-          cp build/distribution/examples/02_triangle/example_02_triangle staging/
-          cp build/distribution/examples/03_texture/example_03_texture staging/
+          cp build/distribution/bin/pong staging/
+          cp build/distribution/bin/flappybird staging/
+          cp build/distribution/bin/example_01_window staging/
+          cp build/distribution/bin/example_02_triangle staging/
+          cp build/distribution/bin/example_03_texture staging/
           cp -r games/flappybird/audio staging/
           cp -r games/flappybird/sprites staging/
           tar -czf ogl-linux-x64.tar.gz -C staging .
@@ -110,11 +110,11 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path staging
-          Copy-Item build/distribution/games/pong/pong.exe staging/
-          Copy-Item build/distribution/games/flappybird/flappybird.exe staging/
-          Copy-Item build/distribution/examples/01_window/example_01_window.exe staging/
-          Copy-Item build/distribution/examples/02_triangle/example_02_triangle.exe staging/
-          Copy-Item build/distribution/examples/03_texture/example_03_texture.exe staging/
+          Copy-Item build/distribution/bin/pong.exe staging/
+          Copy-Item build/distribution/bin/flappybird.exe staging/
+          Copy-Item build/distribution/bin/example_01_window.exe staging/
+          Copy-Item build/distribution/bin/example_02_triangle.exe staging/
+          Copy-Item build/distribution/bin/example_03_texture.exe staging/
           Copy-Item -Recurse games/flappybird/audio staging/
           Copy-Item -Recurse games/flappybird/sprites staging/
           Compress-Archive -Path staging/* -DestinationPath ogl-windows-x64.zip

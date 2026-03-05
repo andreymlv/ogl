@@ -69,7 +69,7 @@ void Scene::onRender(Renderer2D &renderer, const Camera2D &camera)
         calls.push_back({tf.position, tf.scale, sp.color, sp.texture, sp.zOrder});
     }
 
-    std::sort(calls.begin(), calls.end(), [](const DrawCall &a, const DrawCall &b) {
+    std::ranges::sort(calls, [](const DrawCall &a, const DrawCall &b) {
         return a.zOrder < b.zOrder;
     });
 
