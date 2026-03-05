@@ -55,8 +55,6 @@ jobs:
 
       - uses: lukka/get-cmake@latest
 
-      - uses: lukka/run-vcpkg@v11
-
       - name: Restore vcpkg binary cache
         uses: actions/cache/restore@v4
         id: vcpkg-cache
@@ -66,6 +64,9 @@ jobs:
           restore-keys: |
             vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-
             vcpkg-${{ runner.os }}-
+
+      - name: Bootstrap vcpkg
+        run: python3 meta/build-vcpkg.py
 
       - name: Configure (Linux)
         if: runner.os == 'Linux'

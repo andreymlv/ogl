@@ -13,7 +13,8 @@
       },
       "environment": {
         "PROJECT_SOURCE_DIR": "${fileDir}/../..",
-        "VCPKG_BINARY_SOURCES": "clear;files,$env{PROJECT_SOURCE_DIR}/build/caches/vcpkg-binary-cache,readwrite;$penv{VCPKG_BINARY_SOURCES}"
+        "VCPKG_ROOT": "$env{PROJECT_SOURCE_DIR}/build/vcpkg",
+        "VCPKG_BINARY_SOURCES": "clear;files,$env{PROJECT_SOURCE_DIR}/build/caches/vcpkg-binary-cache,readwrite"
       },
       "vendor": {
         "jetbrains.com/clion": {
