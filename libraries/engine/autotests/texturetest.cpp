@@ -12,8 +12,10 @@
 // Texture loading and GL object RAII both require an active OpenGL context.
 // A hidden 1×1 GLFW window is created once for the whole suite.
 
-static constexpr const char *kTestImage =
-    "/home/andreymlv/src/ogl/libraries/engine/autotests/container.jpg";
+static QString testImage()
+{
+    return QString::fromLocal8Bit(qgetenv("PROJECT_SOURCE_DIR")) + QStringLiteral("/libraries/engine/autotests/container.jpg");
+}
 
 class TextureTest : public QObject
 {
@@ -98,34 +100,34 @@ void TextureTest::initWithBadPathLeavesInvalid()
 void TextureTest::initWithValidPathReturnsTrue()
 {
     engine::Texture t;
-    QVERIFY(t.init(kTestImage));
+    QVERIFY(t.init(testImage().toStdString()));
 }
 
 void TextureTest::initWithValidPathIsValid()
 {
     engine::Texture t;
-    t.init(kTestImage);
+    t.init(testImage().toStdString());
     QVERIFY(t.isValid());
 }
 
 void TextureTest::widthIsPositiveAfterInit()
 {
     engine::Texture t;
-    t.init(kTestImage);
+    t.init(testImage().toStdString());
     QVERIFY(t.width() > 0);
 }
 
 void TextureTest::heightIsPositiveAfterInit()
 {
     engine::Texture t;
-    t.init(kTestImage);
+    t.init(testImage().toStdString());
     QVERIFY(t.height() > 0);
 }
 
 void TextureTest::bindMakesTextureCurrent()
 {
     engine::Texture t;
-    QVERIFY(t.init(kTestImage));
+    QVERIFY(t.init(testImage().toStdString()));
 
     t.bind(0); // bind to texture unit 0
 
@@ -140,7 +142,7 @@ void TextureTest::bindMakesTextureCurrent()
 void TextureTest::drawSpriteIncrementsQuadCount()
 {
     engine::Texture t;
-    QVERIFY(t.init(kTestImage));
+    QVERIFY(t.init(testImage().toStdString()));
 
     engine::Renderer2D r;
     QVERIFY(r.init());
