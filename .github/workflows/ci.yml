@@ -5,6 +5,7 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_dispatch:
 
 env:
   PROJECT_SOURCE_DIR: ${{ github.workspace }}
