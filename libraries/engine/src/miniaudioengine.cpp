@@ -6,6 +6,7 @@
 
 #include "audioclip.h"
 
+#include <string>
 #include <vector>
 
 namespace engine
@@ -30,11 +31,7 @@ public:
     {
         d->m_samples.assign(samples.begin(), samples.end());
 
-        ma_audio_buffer_config cfg = ma_audio_buffer_config_init(
-            ma_format_f32, 1,
-            d->m_samples.size(),
-            d->m_samples.data(),
-            nullptr);
+        ma_audio_buffer_config cfg = ma_audio_buffer_config_init(ma_format_f32, 1, d->m_samples.size(), d->m_samples.data(), nullptr);
         cfg.sampleRate = static_cast<ma_uint32>(sampleRate);
 
         if (ma_audio_buffer_init(&cfg, &d->m_buffer) != MA_SUCCESS) {
