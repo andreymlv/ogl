@@ -96,37 +96,106 @@ jobs:
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          mkdir -p staging
-          cp build/distribution/bin/pong staging/
-          cp build/distribution/bin/flappybird staging/
-          cp build/distribution/bin/example_01_window staging/
-          cp build/distribution/bin/example_02_triangle staging/
-          cp build/distribution/bin/example_03_texture staging/
-          cp -r games/flappybird/audio staging/
-          cp -r games/flappybird/sprites staging/
-          tar -czf ogl-linux-x64.tar.gz -C staging .
+          mkdir -p ogl-linux-x64
+          cp build/distribution/bin/pong ogl-linux-x64/
+          cp build/distribution/bin/flappybird ogl-linux-x64/
+          cp build/distribution/bin/example_01_window ogl-linux-x64/
+          cp build/distribution/bin/example_02_triangle ogl-linux-x64/
+          cp build/distribution/bin/example_03_texture ogl-linux-x64/
+          cp -r games/flappybird/audio ogl-linux-x64/
+          cp -r games/flappybird/sprites ogl-linux-x64/
+          tar -czf ogl-linux-x64.tar.gz ogl-linux-x64
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path staging
-          Copy-Item build/distribution/bin/pong.exe staging/
-          Copy-Item build/distribution/bin/flappybird.exe staging/
-          Copy-Item build/distribution/bin/example_01_window.exe staging/
-          Copy-Item build/distribution/bin/example_02_triangle.exe staging/
-          Copy-Item build/distribution/bin/example_03_texture.exe staging/
-          Copy-Item -Recurse games/flappybird/audio staging/
-          Copy-Item -Recurse games/flappybird/sprites staging/
-          Compress-Archive -Path staging/* -DestinationPath ogl-windows-x64.zip
+          New-Item -ItemType Directory -Force -Path ogl-windows-x64
+          Copy-Item build/distribution/bin/pong.exe ogl-windows-x64/
+          Copy-Item build/distribution/bin/flappybird.exe ogl-windows-x64/
+          Copy-Item build/distribution/bin/example_01_window.exe ogl-windows-x64/
+          Copy-Item build/distribution/bin/example_02_triangle.exe ogl-windows-x64/
+          Copy-Item build/distribution/bin/example_03_texture.exe ogl-windows-x64/
+          Copy-Item -Recurse games/flappybird/audio ogl-windows-x64/
+          Copy-Item -Recurse games/flappybird/sprites ogl-windows-x64/
+          Compress-Archive -Path ogl-windows-x64 -DestinationPath ogl-windows-x64.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
 
+  build-musl:
+    name: Build (Linux musl)
+    runs-on: ubuntu-latest
+    container: alpine:3.21
+
+    env:
+      PROJECT_SOURCE_DIR: ${{ github.workspace }}
+
+    steps:
+      - name: Install system dependencies
+        run: |
+          apk add --no-cache \
+            git clang clang-dev lld musl-dev linux-headers \
+            cmake ninja python3 pkgconf curl zip unzip tar \
+            autoconf autoconf-archive automake libtool \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            wayland-dev wayland-protocols-dev libxkbcommon-dev \
+            mesa-dev perl bash
+
+      - uses: actions/checkout@v6
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache/restore@v4
+        id: vcpkg-cache
+        with:
+          path: build/caches/vcpkg-binary-cache
+          key: vcpkg-musl-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-musl-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-
+            vcpkg-musl-
+
+      - name: Bootstrap vcpkg
+        run: python3 meta/build-vcpkg.py
+
+      - name: Configure
+        run: >
+          cmake --preset Distribution
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
+          -DBUILD_TESTING=OFF
+
+      - name: Build
+        run: cmake --build --preset Distribution
+
+      - name: Save vcpkg binary cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: build/caches/vcpkg-binary-cache
+          key: vcpkg-musl-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-${{ github.run_id }}
+
+      - name: Package
+        run: |
+          mkdir -p ogl-linux-musl-x64
+          cp build/distribution/bin/pong ogl-linux-musl-x64/
+          cp build/distribution/bin/flappybird ogl-linux-musl-x64/
+          cp build/distribution/bin/example_01_window ogl-linux-musl-x64/
+          cp build/distribution/bin/example_02_triangle ogl-linux-musl-x64/
+          cp build/distribution/bin/example_03_texture ogl-linux-musl-x64/
+          cp -r games/flappybird/audio ogl-linux-musl-x64/
+          cp -r games/flappybird/sprites ogl-linux-musl-x64/
+          tar -czf ogl-linux-musl-x64.tar.gz ogl-linux-musl-x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ogl-linux-musl-x64.tar.gz
+          path: ogl-linux-musl-x64.tar.gz
+
   release:
-    needs: build
+    needs: [build, build-musl]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -152,6 +221,7 @@ jobs:
           generate_release_notes: true
           files: |
             ogl-linux-x64.tar.gz
+            ogl-linux-musl-x64.tar.gz
             ogl-windows-x64.zip
 
       - name: Create release (nightly)
@@ -166,4 +236,5 @@ jobs:
             Commit: ${{ github.sha }}
           files: |
             ogl-linux-x64.tar.gz
+            ogl-linux-musl-x64.tar.gz
             ogl-windows-x64.zip

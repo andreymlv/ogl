@@ -92,3 +92,55 @@ jobs:
       - name: Test (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run ctest --preset Distribution
+
+  build-musl:
+    name: Linux (musl)
+    runs-on: ubuntu-latest
+    container: alpine:3.21
+
+    env:
+      PROJECT_SOURCE_DIR: ${{ github.workspace }}
+
+    steps:
+      - name: Install system dependencies
+        run: |
+          apk add --no-cache \
+            git clang clang-dev lld musl-dev linux-headers \
+            cmake ninja python3 pkgconf curl zip unzip tar \
+            autoconf autoconf-archive automake libtool \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            wayland-dev wayland-protocols-dev libxkbcommon-dev \
+            mesa-dev perl bash
+
+      - uses: actions/checkout@v6
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache/restore@v4
+        id: vcpkg-cache
+        with:
+          path: build/caches/vcpkg-binary-cache
+          key: vcpkg-musl-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-musl-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-
+            vcpkg-musl-
+
+      - name: Bootstrap vcpkg
+        run: python3 meta/build-vcpkg.py
+
+      - name: Configure
+        run: >
+          cmake --preset Distribution
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
+          -DBUILD_TESTING=OFF
+
+      - name: Build
+        run: cmake --build --preset Distribution
+
+      - name: Save vcpkg binary cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: build/caches/vcpkg-binary-cache
+          key: vcpkg-musl-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-${{ github.run_id }}
