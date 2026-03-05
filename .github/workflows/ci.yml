@@ -106,7 +106,7 @@ jobs:
       - name: Install system dependencies
         run: |
           apk add --no-cache \
-            git clang clang-dev lld musl-dev linux-headers \
+            git clang clang-dev lld g++ musl-dev linux-headers \
             ninja make python3 py3-pip pkgconf curl zip unzip tar \
             autoconf autoconf-archive automake libtool \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
@@ -135,7 +135,7 @@ jobs:
           -DCMAKE_C_COMPILER=clang
           -DCMAKE_CXX_COMPILER=clang++
           -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja
-          -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
+          -DCMAKE_EXE_LINKER_FLAGS="-static -static-libstdc++ -static-libgcc -fuse-ld=lld"
           -DBUILD_TESTING=OFF
 
       - name: Build
