@@ -8,6 +8,7 @@
 //
 
 #include <application.h>
+#include <miniaudioengine.h>
 #include <glfwwindow.h>
 #include <openglrenderer.h>
 
@@ -40,7 +41,8 @@ int main(int argc, char *argv[])
     auto renderer = std::make_unique<engine::OpenGLRenderer>();
 
     WindowApp app;
-    if (!app.init(std::move(window), std::move(renderer))) {
+    auto audio = std::make_unique<engine::MiniaudioEngine>();
+    if (!app.init(std::move(window), std::move(renderer), std::move(audio))) {
         return 1;
     }
 

@@ -9,33 +9,49 @@
 //   Client → Host : InputPacket  (1 float: paddle direction)
 //   Host   → Client: StatePacket  (ball + paddles + scores)
 //
-// Sound: miniaudio (header-only), procedural sine beeps — no .wav files needed.
+// Sound: engine AudioEngine abstraction (backed by miniaudio) — no .wav files needed.
+//
+// Engine features used:
+//   Application + LayerStack  — game loop + layer dispatch
+//   Layer (PongLayer)         — encapsulates all game logic
+//   Scene + Entity            — ball, paddles, net, scorebars as ECS entities
+//   Camera2D                  — NDC ortho projection
+//   Renderer2D                — batched quad rendering
+//   AudioEngine / AudioClip   — abstract sound backend
 //
 
-// miniaudio implementation — must be defined exactly once.
-#define MINIAUDIO_IMPLEMENTATION
-#include <miniaudio.h>
-
 #include <application.h>
+#include <audioclip.h>
+#include <audioengine.h>
+#include <camera2d.h>
+#include <components.h>
 #include <glfwwindow.h>
+#include <layer.h>
+#include <miniaudioengine.h>
 #include <openglrenderer.h>
 #include <renderer2d.h>
+#include <scene.h>
+#include <window.h>
 
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QDataStream>
 #include <QHostAddress>
 #include <QNetworkDatagram>
+#include <QObject>
 #include <QUdpSocket>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <memory>
 #include <numbers>
 #include <vector>
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 static constexpr quint16 kHostPort = 7755;
+static constexpr int kSampleRate = 44100;
 
 // NDC coordinates (-1..1 on both axes)
 static constexpr float kPaddleW = 0.04F;
@@ -48,21 +64,16 @@ static constexpr float kBallSpeedIncrease = 1.08F;
 
 static constexpr float kLeftPaddleX = -0.92F;
 static constexpr float kRightPaddleX = 0.88F;
+static constexpr int kNetSegments = 10;
+static constexpr float kMaxScore = 7.0F;
 
 // ── Network packets ───────────────────────────────────────────────────────────
-//
-// QDataStream handles endianness (always big-endian on the wire) and alignment.
-// No #pragma pack, no reinterpret_cast, no memcpy — just type-safe operators.
-//
-// A one-byte tag distinguishes packet types so both directions share one port.
 
 enum class PacketType : quint8 {
     Input = 1,
     State = 2
 };
 
-// Direction is one of three states — qint8 is more expressive and cheaper
-// on the wire than a float.
 enum class Direction : qint8 {
     Down = -1,
     Idle = 0,
@@ -71,16 +82,11 @@ enum class Direction : qint8 {
 
 // ── Game state ────────────────────────────────────────────────────────────────
 
-// Single source of truth for both host simulation and client rendering.
-// Ball velocity (m_vx, m_vy) is only meaningful on the host — the client
-// leaves them at 0 since it doesn't simulate physics.
-// Serialization selectively marshals only the fields that cross the wire.
-
 struct Ball {
     float m_x = 0.0F;
     float m_y = 0.0F;
-    float m_vx = kBallSpeedInitial; // host only — not serialized
-    float m_vy = kBallSpeedInitial * 0.6F; // host only — not serialized
+    float m_vx = kBallSpeedInitial; // host only
+    float m_vy = kBallSpeedInitial * 0.6F; // host only
 };
 
 struct GameState {
@@ -105,7 +111,6 @@ static QByteArray serialize(const InputPacket &p)
     return buf;
 }
 
-// Only positions and scores cross the wire — velocity stays on the host.
 static QByteArray serialize(const GameState &s)
 {
     QByteArray buf;
@@ -128,7 +133,6 @@ static bool deserialize(const QByteArray &buf, InputPacket &out)
     return ds.status() == QDataStream::Ok;
 }
 
-// Deserialize into GameState — velocity fields are untouched (stay at default 0).
 static bool deserialize(const QByteArray &buf, GameState &out)
 {
     QDataStream ds(buf);
@@ -141,92 +145,23 @@ static bool deserialize(const QByteArray &buf, GameState &out)
     return ds.status() == QDataStream::Ok;
 }
 
-// ── Sound ─────────────────────────────────────────────────────────────────────
+// ── Sine helper ───────────────────────────────────────────────────────────────
 
-class Sound
+static std::vector<float> makeSine(float freq, float duration)
 {
-public:
-    Sound() = default;
-
-    bool init()
-    {
-        if (ma_engine_init(nullptr, &m_engine) != MA_SUCCESS) {
-            return false;
-        }
-        m_hitSamples = makeSine(440.0F, 0.08F);
-        m_scoreSamples = makeSine(220.0F, 0.40F);
-        setupSound(m_hitSound, m_hitBuf, m_hitSamples);
-        setupSound(m_scoreSound, m_scoreBuf, m_scoreSamples);
-        m_valid = true;
-        return true;
+    const int n = static_cast<int>(duration * kSampleRate);
+    std::vector<float> buf(static_cast<std::size_t>(n));
+    for (int i = 0; i < n; ++i) {
+        const float t = static_cast<float>(i) / kSampleRate;
+        const float env = 1.0F - std::clamp((t / duration - 0.8F) / 0.2F, 0.0F, 1.0F);
+        buf[static_cast<std::size_t>(i)] = 0.4F * env * std::sin(2.0F * std::numbers::pi_v<float> * freq * t);
     }
+    return buf;
+}
 
-    ~Sound()
-    {
-        if (!m_valid) {
-            return;
-        }
-        ma_sound_uninit(&m_hitSound);
-        ma_sound_uninit(&m_scoreSound);
-        ma_audio_buffer_uninit(&m_hitBuf);
-        ma_audio_buffer_uninit(&m_scoreBuf);
-        ma_engine_uninit(&m_engine);
-    }
+// ── PongLayer ─────────────────────────────────────────────────────────────────
 
-    Sound(const Sound &) = delete;
-    Sound &operator=(const Sound &) = delete;
-
-    void playHit()
-    {
-        replay(m_hitSound);
-    }
-    void playScore()
-    {
-        replay(m_scoreSound);
-    }
-
-private:
-    static constexpr int kSampleRate = 44100;
-
-    static std::vector<float> makeSine(float freq, float duration)
-    {
-        const int n = static_cast<int>(duration * kSampleRate);
-        std::vector<float> buf(static_cast<std::size_t>(n));
-        for (int i = 0; i < n; ++i) {
-            const float t = static_cast<float>(i) / kSampleRate;
-            const float env = 1.0F - std::clamp((t / duration - 0.8F) / 0.2F, 0.0F, 1.0F);
-            buf[static_cast<std::size_t>(i)] = 0.4F * env * std::sin(2.0F * std::numbers::pi_v<float> * freq * t);
-        }
-        return buf;
-    }
-
-    void setupSound(ma_sound &sound, ma_audio_buffer &buf, std::vector<float> &samples)
-    {
-        ma_audio_buffer_config cfg = ma_audio_buffer_config_init(ma_format_f32, 1, samples.size(), samples.data(), nullptr);
-        cfg.sampleRate = kSampleRate;
-        ma_audio_buffer_init(&cfg, &buf);
-        ma_sound_init_from_data_source(&m_engine, &buf, 0, nullptr, &sound);
-    }
-
-    static void replay(ma_sound &sound)
-    {
-        ma_sound_seek_to_pcm_frame(&sound, 0);
-        ma_sound_start(&sound);
-    }
-
-    ma_engine m_engine{};
-    ma_audio_buffer m_hitBuf{};
-    ma_audio_buffer m_scoreBuf{};
-    ma_sound m_hitSound{};
-    ma_sound m_scoreSound{};
-    std::vector<float> m_hitSamples;
-    std::vector<float> m_scoreSamples;
-    bool m_valid = false;
-};
-
-// ── PongGame ──────────────────────────────────────────────────────────────────
-
-class PongGame : public engine::Application
+class PongLayer : public engine::Layer, public QObject
 {
 public:
     enum class Role : quint8 {
@@ -234,27 +169,75 @@ public:
         Client
     };
 
-    bool onInit(Role role, const QString &hostIp)
+    PongLayer(engine::Window &window, engine::AudioEngine &audio, Role role, const QString &hostIp)
+        : engine::Layer(QStringLiteral("pong"))
+        , m_window(window)
+        , m_audio(audio)
+        , m_role(role)
     {
-        m_role = role;
-
-        if (!m_r2d.init()) {
-            return false;
+        if (!hostIp.isEmpty()) {
+            m_hostAddress = QHostAddress(hostIp);
         }
-        m_sound.init(); // non-fatal if audio device unavailable
+    }
 
+    // Called by LayerStack when pushed onto Application.
+    void onAttach() override
+    {
+        // Init Renderer2D — requires an active GL context (already set up by OpenGLRenderer).
+        m_r2d.init();
+
+        // Create audio clips — non-fatal if no device.
+        m_hitClip = m_audio.createSound(makeSine(440.0F, 0.08F), kSampleRate);
+        m_scoreClip = m_audio.createSound(makeSine(220.0F, 0.40F), kSampleRate);
+
+        // Build the scene — one entity per visual object.
+        m_ball = m_scene.createEntity("ball");
+        m_ball.addComponent<engine::Transform>().scale = {kBallSize, kBallSize};
+        m_ball.addComponent<engine::Sprite>().color = kWhite;
+
+        m_p1 = m_scene.createEntity("p1");
+        m_p1.addComponent<engine::Transform>().scale = {kPaddleW, kPaddleH};
+        m_p1.addComponent<engine::Sprite>().color = kWhite;
+
+        m_p2 = m_scene.createEntity("p2");
+        m_p2.addComponent<engine::Transform>().scale = {kPaddleW, kPaddleH};
+        m_p2.addComponent<engine::Sprite>().color = kWhite;
+
+        for (int i = 0; i < kNetSegments; ++i) {
+            auto seg = m_scene.createEntity("net");
+            auto &tf = seg.addComponent<engine::Transform>();
+            tf.position = {-0.01F, -0.95F + static_cast<float>(i) * 0.20F};
+            tf.scale = {0.02F, 0.09F};
+            seg.addComponent<engine::Sprite>().color = kDim;
+            m_net[static_cast<std::size_t>(i)] = seg;
+        }
+
+        m_score1Bar = m_scene.createEntity("score1");
+        m_score1Bar.addComponent<engine::Transform>().position = {-0.98F, 0.90F};
+        m_score1Bar.addComponent<engine::Sprite>().color = kRed;
+
+        m_score2Bar = m_scene.createEntity("score2");
+        m_score2Bar.addComponent<engine::Transform>().position = {0.54F, 0.90F};
+        m_score2Bar.addComponent<engine::Sprite>().color = kBlue;
+
+        // Network socket
         m_socket = new QUdpSocket(this);
         if (m_role == Role::Host) {
             m_socket->bind(QHostAddress::AnyIPv4, kHostPort);
         } else {
             m_socket->bind(QHostAddress::AnyIPv4, 0);
-            m_hostAddress = QHostAddress(hostIp);
         }
-        QObject::connect(m_socket, &QUdpSocket::readyRead, this, &PongGame::onReadyRead);
-        return true;
+        QObject::connect(m_socket, &QUdpSocket::readyRead, this, &PongLayer::onReadyRead);
     }
 
-protected:
+    void onDetach() override
+    {
+        m_hitClip.reset();
+        m_scoreClip.reset();
+        delete m_socket;
+        m_socket = nullptr;
+    }
+
     void onUpdate(float dt) override
     {
         if (m_role == Role::Host) {
@@ -262,45 +245,60 @@ protected:
         } else {
             clientUpdate();
         }
+        syncScene();
     }
 
     void onRender() override
     {
-        const glm::vec4 white{1.0F, 1.0F, 1.0F, 1.0F};
-        const glm::vec4 dim{0.25F, 0.25F, 0.25F, 1.0F};
-        const glm::vec4 red{1.0F, 0.25F, 0.25F, 1.0F};
-        const glm::vec4 blue{0.25F, 0.50F, 1.0F, 1.0F};
-
-        m_r2d.beginScene();
-
-        // Net — 10 dashed segments
-        for (int i = 0; i < 10; ++i) {
-            m_r2d.drawQuad({-0.01F, -0.95F + static_cast<float>(i) * 0.20F}, {0.02F, 0.09F}, dim);
-        }
-
-        // Paddles
-        m_r2d.drawQuad({kLeftPaddleX, m_state.m_p1Y - kPaddleH / 2.0F}, {kPaddleW, kPaddleH}, white);
-        m_r2d.drawQuad({kRightPaddleX, m_state.m_p2Y - kPaddleH / 2.0F}, {kPaddleW, kPaddleH}, white);
-
-        // Ball
-        m_r2d.drawQuad({m_state.m_ball.m_x - kBallSize / 2.0F, m_state.m_ball.m_y - kBallSize / 2.0F}, {kBallSize, kBallSize}, white);
-
-        // Score bars (proportional fill, max 7 points)
-        static constexpr float kMaxScore = 7.0F;
-        const float s1 = std::min(static_cast<float>(m_state.m_score1) / kMaxScore, 1.0F) * 0.44F;
-        const float s2 = std::min(static_cast<float>(m_state.m_score2) / kMaxScore, 1.0F) * 0.44F;
-        if (s1 > 0.0F) {
-            m_r2d.drawQuad({-0.98F, 0.90F}, {s1, 0.05F}, red);
-        }
-        if (s2 > 0.0F) {
-            m_r2d.drawQuad({0.54F, 0.90F}, {s2, 0.05F}, blue);
-        }
-
-        m_r2d.endScene();
+        m_scene.onRender(m_r2d, m_cam);
     }
 
 private:
-    // ── Host ────────────────────────────────────────────────────────────────
+    // ── Colors ───────────────────────────────────────────────────────────────
+
+    static constexpr glm::vec4 kWhite{1.0F, 1.0F, 1.0F, 1.0F};
+    static constexpr glm::vec4 kDim{0.25F, 0.25F, 0.25F, 1.0F};
+    static constexpr glm::vec4 kRed{1.0F, 0.25F, 0.25F, 1.0F};
+    static constexpr glm::vec4 kBlue{0.25F, 0.50F, 1.0F, 1.0F};
+
+    // ── Sound helpers ────────────────────────────────────────────────────────
+
+    void playHit()
+    {
+        if (m_hitClip) {
+            m_hitClip->play();
+        }
+    }
+
+    void playScore()
+    {
+        if (m_scoreClip) {
+            m_scoreClip->play();
+        }
+    }
+
+    // ── Sync game state → scene components ──────────────────────────────────
+
+    void syncScene()
+    {
+        // Ball
+        m_ball.getComponent<engine::Transform>().position = {
+            m_state.m_ball.m_x - kBallSize / 2.0F,
+            m_state.m_ball.m_y - kBallSize / 2.0F,
+        };
+
+        // Paddles
+        m_p1.getComponent<engine::Transform>().position = {kLeftPaddleX, m_state.m_p1Y - kPaddleH / 2.0F};
+        m_p2.getComponent<engine::Transform>().position = {kRightPaddleX, m_state.m_p2Y - kPaddleH / 2.0F};
+
+        // Score bars — scale width proportionally, hide if zero
+        const float s1 = std::min(static_cast<float>(m_state.m_score1) / kMaxScore, 1.0F) * 0.44F;
+        const float s2 = std::min(static_cast<float>(m_state.m_score2) / kMaxScore, 1.0F) * 0.44F;
+        m_score1Bar.getComponent<engine::Transform>().scale = {s1 > 0.0F ? s1 : 0.0F, 0.05F};
+        m_score2Bar.getComponent<engine::Transform>().scale = {s2 > 0.0F ? s2 : 0.0F, 0.05F};
+    }
+
+    // ── Host ─────────────────────────────────────────────────────────────────
 
     void hostUpdate(float dt)
     {
@@ -326,7 +324,7 @@ private:
         if (b.m_y + kBallSize / 2.0F >= 1.0F || b.m_y - kBallSize / 2.0F <= -1.0F) {
             b.m_vy = -b.m_vy;
             b.m_y = std::clamp(b.m_y, -1.0F + kBallSize / 2.0F, 1.0F - kBallSize / 2.0F);
-            m_sound.playHit();
+            playHit();
         }
 
         // Paddle collisions
@@ -339,18 +337,18 @@ private:
         if (leftHit) {
             b.m_vx = std::min(-b.m_vx * kBallSpeedIncrease, kBallSpeedMax);
             b.m_vy = ((b.m_y - m_state.m_p1Y) / (kPaddleH / 2.0F)) * std::abs(b.m_vx) * 0.75F;
-            m_sound.playHit();
+            playHit();
         }
         if (rightHit) {
             b.m_vx = std::max(-b.m_vx * kBallSpeedIncrease, -kBallSpeedMax);
             b.m_vy = ((b.m_y - m_state.m_p2Y) / (kPaddleH / 2.0F)) * std::abs(b.m_vx) * 0.75F;
-            m_sound.playHit();
+            playHit();
         }
 
         // Scoring
         if (b.m_x > 1.0F) {
             ++m_state.m_score1;
-            m_sound.playScore();
+            playScore();
             m_state.m_ball = {
                 .m_x = 0.0F,
                 .m_y = 0.0F,
@@ -359,7 +357,7 @@ private:
             };
         } else if (b.m_x < -1.0F) {
             ++m_state.m_score2;
-            m_sound.playScore();
+            playScore();
             m_state.m_ball = {
                 .m_x = 0.0F,
                 .m_y = 0.0F,
@@ -377,22 +375,21 @@ private:
         m_socket->writeDatagram(serialize(m_state), m_clientAddress, m_clientPort);
     }
 
-    // ── Client ──────────────────────────────────────────────────────────────
+    // ── Client ───────────────────────────────────────────────────────────────
 
     void clientUpdate()
     {
         m_socket->writeDatagram(serialize(InputPacket{localDir()}), m_hostAddress, kHostPort);
     }
 
-    // ── Shared ──────────────────────────────────────────────────────────────
+    // ── Shared ───────────────────────────────────────────────────────────────
 
     Direction localDir() const
     {
-        const auto &w = window();
-        if (w.isKeyPressed(engine::Key::W) || w.isKeyPressed(engine::Key::Up)) {
+        if (m_window.isKeyPressed(engine::Key::W) || m_window.isKeyPressed(engine::Key::Up)) {
             return Direction::Up;
         }
-        if (w.isKeyPressed(engine::Key::S) || w.isKeyPressed(engine::Key::Down)) {
+        if (m_window.isKeyPressed(engine::Key::S) || m_window.isKeyPressed(engine::Key::Down)) {
             return Direction::Down;
         }
         return Direction::Idle;
@@ -406,7 +403,6 @@ private:
             if (m_role == Role::Host) {
                 m_clientAddress = dg.senderAddress();
                 m_clientPort = static_cast<quint16>(dg.senderPort());
-
                 InputPacket pkt;
                 if (deserialize(dg.data(), pkt)) {
                     m_remoteDir = pkt.m_direction;
@@ -420,10 +416,29 @@ private:
         }
     }
 
-    Role m_role = Role::Host;
+    // ── Members ──────────────────────────────────────────────────────────────
+
+    engine::Window &m_window;
+    engine::AudioEngine &m_audio;
+    Role m_role;
+
     GameState m_state;
+    engine::Scene m_scene;
+    engine::Camera2D m_cam{-1.F, 1.F, -1.F, 1.F};
     engine::Renderer2D m_r2d;
-    Sound m_sound;
+
+    // Scene entities
+    engine::Entity m_ball;
+    engine::Entity m_p1;
+    engine::Entity m_p2;
+    std::array<engine::Entity, kNetSegments> m_net;
+    engine::Entity m_score1Bar;
+    engine::Entity m_score2Bar;
+
+    // Audio clips
+    std::unique_ptr<engine::AudioClip> m_hitClip;
+    std::unique_ptr<engine::AudioClip> m_scoreClip;
+
     QUdpSocket *m_socket = nullptr;
 
     // Host
@@ -433,6 +448,19 @@ private:
 
     // Client
     QHostAddress m_hostAddress;
+};
+
+// ── PongGame ──────────────────────────────────────────────────────────────────
+
+class PongGame : public engine::Application
+{
+public:
+    bool onInit(PongLayer::Role role, const QString &hostIp)
+    {
+        auto layer = std::make_unique<PongLayer>(window(), audioEngine(), role, hostIp);
+        pushLayer(std::move(layer));
+        return true;
+    }
 };
 
 // ── main ──────────────────────────────────────────────────────────────────────
@@ -461,12 +489,13 @@ int main(int argc, char *argv[])
     }
 
     auto renderer = std::make_unique<engine::OpenGLRenderer>();
+    auto audio = std::make_unique<engine::MiniaudioEngine>();
 
     PongGame game;
-    if (!game.init(std::move(window), std::move(renderer))) {
+    if (!game.init(std::move(window), std::move(renderer), std::move(audio))) {
         return 1;
     }
-    if (!game.onInit(isHost ? PongGame::Role::Host : PongGame::Role::Client, hostIp)) {
+    if (!game.onInit(isHost ? PongLayer::Role::Host : PongLayer::Role::Client, hostIp)) {
         return 1;
     }
 

@@ -26,7 +26,7 @@ public:
 
     ~GlObject()
     {
-        if (m_id) {
+        if (m_id != 0) {
             Deleter(m_id);
         }
     }
@@ -39,7 +39,7 @@ public:
     GlObject &operator=(GlObject &&other) noexcept
     {
         if (this != &other) {
-            if (m_id) {
+            if (m_id != 0) {
                 Deleter(m_id);
             }
             m_id = std::exchange(other.m_id, 0);

@@ -2,10 +2,16 @@ add_library(engine)
 
 target_sources(engine PRIVATE
     application.cpp
+    camera2d.cpp
     glfwwindow.cpp
+    layer.cpp
+    layerstack.cpp
+    miniaudioengine.cpp
     openglrenderer.cpp
     renderer2d.cpp
+    scene.cpp
     shader.cpp
+    texture.cpp
 )
 
 ecm_generate_export_header(engine
@@ -25,6 +31,7 @@ target_link_libraries(engine
         glfw
         glad::glad
         glm::glm
+        EnTT::EnTT
         Qt::Core
 )
 

@@ -1,5 +1,6 @@
 #include <QTest>
 
+#include "camera2d.h"
 #include "renderer2d.h"
 
 #include <glad/glad.h>
@@ -33,6 +34,8 @@ private Q_SLOTS:
 
 private:
     GLFWwindow *m_ctx = nullptr;
+    // Unit ortho camera — NDC space, no transformation.
+    engine::Camera2D m_cam{-1.F, 1.F, -1.F, 1.F};
 };
 
 // ── fixture ───────────────────────────────────────────────────────────────────
@@ -87,7 +90,7 @@ void Renderer2DTest::quadCountIsZeroAfterBeginScene()
 {
     engine::Renderer2D r;
     r.init();
-    r.beginScene();
+    r.beginScene(m_cam);
     QCOMPARE(r.quadCount(), 0);
 }
 
@@ -95,7 +98,7 @@ void Renderer2DTest::endSceneWithoutQuadsDoesNotCrash()
 {
     engine::Renderer2D r;
     r.init();
-    r.beginScene();
+    r.beginScene(m_cam);
     r.endScene(); // must not crash, draw call with 0 quads is valid
 }
 
@@ -103,7 +106,7 @@ void Renderer2DTest::drawQuadIncrementsCount()
 {
     engine::Renderer2D r;
     r.init();
-    r.beginScene();
+    r.beginScene(m_cam);
     r.drawQuad({0.F, 0.F}, {1.F, 1.F}, {1.F, 0.F, 0.F, 1.F});
     QCOMPARE(r.quadCount(), 1);
 }
@@ -112,7 +115,7 @@ void Renderer2DTest::drawMultipleQuadsAccumulatesCount()
 {
     engine::Renderer2D r;
     r.init();
-    r.beginScene();
+    r.beginScene(m_cam);
     r.drawQuad({0.F, 0.F}, {1.F, 1.F}, {1.F, 0.F, 0.F, 1.F});
     r.drawQuad({2.F, 0.F}, {1.F, 1.F}, {0.F, 1.F, 0.F, 1.F});
     r.drawQuad({4.F, 0.F}, {1.F, 1.F}, {0.F, 0.F, 1.F, 1.F});
@@ -124,11 +127,11 @@ void Renderer2DTest::quadCountResetsOnNextBeginScene()
     engine::Renderer2D r;
     r.init();
 
-    r.beginScene();
+    r.beginScene(m_cam);
     r.drawQuad({0.F, 0.F}, {1.F, 1.F}, {1.F, 1.F, 1.F, 1.F});
     r.endScene();
 
-    r.beginScene(); // new frame — count must reset
+    r.beginScene(m_cam); // new frame — count must reset
     QCOMPARE(r.quadCount(), 0);
 }
 

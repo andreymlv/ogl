@@ -3,6 +3,7 @@
 #include <QTimer>
 
 #include "application.h"
+#include "audioengine.h"
 #include "renderer.h"
 #include "window.h"
 
@@ -88,6 +89,32 @@ std::unique_ptr<MockRenderer> makeRenderer()
     return std::make_unique<MockRenderer>();
 }
 
+class MockAudioEngine : public engine::AudioEngine
+{
+public:
+    bool m_initResult = true;
+    bool m_initCalled = false;
+
+    bool init() override
+    {
+        m_initCalled = true;
+        return m_initResult;
+    }
+    bool isValid() const override
+    {
+        return m_initCalled && m_initResult;
+    }
+    std::unique_ptr<engine::AudioClip> createSound(std::span<const float>, int) override
+    {
+        return nullptr;
+    }
+};
+
+std::unique_ptr<MockAudioEngine> makeAudio()
+{
+    return std::make_unique<MockAudioEngine>();
+}
+
 } // namespace
 
 // ── Test class ────────────────────────────────────────────────────────────────
@@ -100,16 +127,19 @@ private Q_SLOTS:
     // init() — null checks
     void initWithNullWindowReturnsFalse();
     void initWithNullRendererReturnsFalse();
+    void initWithNullAudioReturnsFalse();
 
     // init() — renderer failure
     void initWhenRendererInitFailsReturnsFalse();
 
     // init() — success
     void initWithValidInputReturnsTrue();
+    void initCallsAudioEngineInit();
 
     // accessors after successful init
     void windowReturnsInjectedWindow();
     void rendererReturnsInjectedRenderer();
+    void audioEngineReturnsInjectedAudioEngine();
 
     // run() — window signals close immediately
     void runExitsWhenWindowShouldClose();
@@ -126,13 +156,19 @@ private Q_SLOTS:
 void ApplicationTest::initWithNullWindowReturnsFalse()
 {
     engine::Application app;
-    QVERIFY(!app.init(nullptr, makeRenderer()));
+    QVERIFY(!app.init(nullptr, makeRenderer(), makeAudio()));
 }
 
 void ApplicationTest::initWithNullRendererReturnsFalse()
 {
     engine::Application app;
-    QVERIFY(!app.init(makeWindow(), nullptr));
+    QVERIFY(!app.init(makeWindow(), nullptr, makeAudio()));
+}
+
+void ApplicationTest::initWithNullAudioReturnsFalse()
+{
+    engine::Application app;
+    QVERIFY(!app.init(makeWindow(), makeRenderer(), nullptr));
 }
 
 void ApplicationTest::initWhenRendererInitFailsReturnsFalse()
@@ -141,13 +177,22 @@ void ApplicationTest::initWhenRendererInitFailsReturnsFalse()
     renderer->m_initResult = false;
 
     engine::Application app;
-    QVERIFY(!app.init(makeWindow(), std::move(renderer)));
+    QVERIFY(!app.init(makeWindow(), std::move(renderer), makeAudio()));
 }
 
 void ApplicationTest::initWithValidInputReturnsTrue()
 {
     engine::Application app;
-    QVERIFY(app.init(makeWindow(), makeRenderer()));
+    QVERIFY(app.init(makeWindow(), makeRenderer(), makeAudio()));
+}
+
+void ApplicationTest::initCallsAudioEngineInit()
+{
+    auto *rawAudio = new MockAudioEngine;
+    engine::Application app;
+    app.init(makeWindow(), makeRenderer(), std::unique_ptr<MockAudioEngine>(rawAudio));
+
+    QVERIFY(rawAudio->m_initCalled);
 }
 
 // ── accessor tests ────────────────────────────────────────────────────────────
@@ -156,7 +201,7 @@ void ApplicationTest::windowReturnsInjectedWindow()
 {
     auto *rawWindow = new MockWindow;
     engine::Application app;
-    app.init(std::unique_ptr<MockWindow>(rawWindow), makeRenderer());
+    app.init(std::unique_ptr<MockWindow>(rawWindow), makeRenderer(), makeAudio());
 
     QCOMPARE(&app.window(), rawWindow);
 }
@@ -165,9 +210,18 @@ void ApplicationTest::rendererReturnsInjectedRenderer()
 {
     auto *rawRenderer = new MockRenderer;
     engine::Application app;
-    app.init(makeWindow(), std::unique_ptr<MockRenderer>(rawRenderer));
+    app.init(makeWindow(), std::unique_ptr<MockRenderer>(rawRenderer), makeAudio());
 
     QCOMPARE(&app.renderer(), rawRenderer);
+}
+
+void ApplicationTest::audioEngineReturnsInjectedAudioEngine()
+{
+    auto *rawAudio = new MockAudioEngine;
+    engine::Application app;
+    app.init(makeWindow(), makeRenderer(), std::unique_ptr<MockAudioEngine>(rawAudio));
+
+    QCOMPARE(&app.audioEngine(), rawAudio);
 }
 
 // ── run() tests ───────────────────────────────────────────────────────────────
@@ -199,7 +253,7 @@ void ApplicationTest::runExitsWhenWindowShouldClose()
     window->m_shouldClose = true;
 
     TestApplication app;
-    app.init(std::move(window), makeRenderer());
+    app.init(std::move(window), makeRenderer(), makeAudio());
 
     // shouldClose is already true — run() exits on the very first tick.
     const int exitCode = app.run();
@@ -215,7 +269,7 @@ void ApplicationTest::runTickCallsRendererBeginAndEnd()
     auto *rawWindow = window.get();
 
     TestApplication app;
-    app.init(std::move(window), std::unique_ptr<MockRenderer>(rawRenderer));
+    app.init(std::move(window), std::unique_ptr<MockRenderer>(rawRenderer), makeAudio());
 
     // Delay slightly so at least one tick runs before we signal close.
     QTimer::singleShot(10, &app, [rawWindow] {
@@ -235,7 +289,7 @@ void ApplicationTest::runTickCallsPollAndSwap()
     auto *rawWindow = window.get();
 
     TestApplication app;
-    app.init(std::move(window), makeRenderer());
+    app.init(std::move(window), makeRenderer(), makeAudio());
 
     // Delay slightly so at least one tick runs before we signal close.
     QTimer::singleShot(10, &app, [rawWindow] {
@@ -254,7 +308,7 @@ void ApplicationTest::runTickCallsOnUpdate()
     auto *rawWindow = window.get();
 
     TestApplication app;
-    app.init(std::move(window), makeRenderer());
+    app.init(std::move(window), makeRenderer(), makeAudio());
 
     // Delay slightly so at least one tick runs before we signal close.
     QTimer::singleShot(10, &app, [rawWindow] {
@@ -272,7 +326,7 @@ void ApplicationTest::runTickCallsOnRender()
     auto *rawWindow = window.get();
 
     TestApplication app;
-    app.init(std::move(window), makeRenderer());
+    app.init(std::move(window), makeRenderer(), makeAudio());
 
     // Delay slightly so at least one tick runs before we signal close.
     QTimer::singleShot(10, &app, [rawWindow] {

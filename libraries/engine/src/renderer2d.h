@@ -9,7 +9,10 @@
 namespace engine
 {
 
+class Camera2D;
 class Renderer2DPrivate;
+class Texture;
+
 
 // Batched 2D drawing API.  One draw call per frame regardless of quad count.
 //
@@ -31,8 +34,9 @@ public:
     bool init();
     bool isValid() const;
 
-    void beginScene();
+    void beginScene(const Camera2D &camera);
     void drawQuad(glm::vec2 position, glm::vec2 size, glm::vec4 color);
+    void drawSprite(glm::vec2 position, glm::vec2 size, const Texture &texture);
     void endScene();
 
     int quadCount() const; // number of quads submitted since beginScene()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <engine_export.h>
+#include "layerstack.h"
 
 #include <QObject>
 
@@ -10,6 +11,8 @@ namespace engine
 {
 
 class ApplicationPrivate;
+class AudioEngine;
+class Layer;
 class Renderer;
 class Window;
 
@@ -28,17 +31,22 @@ public:
     explicit Application(QObject *parent = nullptr);
     ~Application() override;
 
-    // Takes ownership of the window and renderer.
-    // Returns false if either is null or if the renderer fails to initialize.
-    bool init(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer);
+    // Takes ownership of the window, renderer and audio engine.
+    // Returns false if any argument is null or if the renderer fails to initialize.
+    // Audio engine init failure is non-fatal (no audio device in CI) — init() still returns true.
+    bool init(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer, std::unique_ptr<AudioEngine> audio);
 
     // Starts the Qt event loop. Blocks until the window is closed.
     // Requires QCoreApplication to already exist.
     int run();
 
+    void pushLayer(std::unique_ptr<Layer> layer);
+    std::unique_ptr<Layer> popLayer(Layer *layer);
+
     Window &window();
     const Window &window() const;
     Renderer &renderer();
+    AudioEngine &audioEngine();
 
 protected:
     virtual void onUpdate(float dt);

@@ -1,5 +1,8 @@
 #include "application.h"
 
+#include "audioengine.h"
+#include "layer.h"
+#include "layerstack.h"
 #include "renderer.h"
 #include "window.h"
 
@@ -18,7 +21,9 @@ class ApplicationPrivate
 public:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Renderer> m_renderer;
+    std::unique_ptr<AudioEngine> m_audio;
     QElapsedTimer m_frameTimer;
+    LayerStack m_layerStack;
 };
 
 Application::Application(QObject *parent)
@@ -29,7 +34,7 @@ Application::Application(QObject *parent)
 
 Application::~Application() = default;
 
-bool Application::init(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer)
+bool Application::init(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer, std::unique_ptr<AudioEngine> audio)
 {
     if (!window) {
         qCCritical(Engine) << "Window is null";
@@ -41,13 +46,21 @@ bool Application::init(std::unique_ptr<Window> window, std::unique_ptr<Renderer>
         return false;
     }
 
+    if (!audio) {
+        qCCritical(Engine) << "AudioEngine is null";
+        return false;
+    }
+
     if (!renderer->init(*window)) {
         qCCritical(Engine) << "Renderer failed to initialize";
         return false;
     }
 
+    audio->init(); // non-fatal — no audio device in CI is acceptable
+
     d->m_window = std::move(window);
     d->m_renderer = std::move(renderer);
+    d->m_audio = std::move(audio);
 
     // Wire resize events: window notifies renderer, renderer decides how to react.
     // GlfwWindow knows nothing about glViewport; VulkanRenderer would recreate its swapchain.
@@ -86,13 +99,29 @@ Renderer &Application::renderer()
     return *d->m_renderer;
 }
 
+AudioEngine &Application::audioEngine()
+{
+    return *d->m_audio;
+}
+
+void Application::pushLayer(std::unique_ptr<Layer> layer)
+{
+    d->m_layerStack.pushLayer(std::move(layer));
+}
+
+std::unique_ptr<Layer> Application::popLayer(Layer *layer)
+{
+    return d->m_layerStack.popLayer(layer);
+}
+
 void Application::onUpdate(float dt)
 {
-    Q_UNUSED(dt)
+    d->m_layerStack.update(dt);
 }
 
 void Application::onRender()
 {
+    d->m_layerStack.render();
 }
 
 void Application::tick()

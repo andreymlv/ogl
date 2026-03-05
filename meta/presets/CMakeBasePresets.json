@@ -68,6 +68,18 @@
     },
     {
       "hidden": true,
+      "name": "Coverage_base",
+      "displayName": "Coverage Config",
+      "description": "Build with gcov-style coverage instrumentation (ECMCoverageOption)",
+      "binaryDir": "$env{PROJECT_SOURCE_DIR}/build/coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_COVERAGE": "ON",
+        "VCPKG_OVERLAY_TRIPLETS": "$env{PROJECT_SOURCE_DIR}/Meta/CMake/vcpkg/debug-triplets"
+      }
+    },
+    {
+      "hidden": true,
       "name": "Fuzzers_base",
       "displayName": "Fuzzers Config",
       "description": "Fuzzers build",

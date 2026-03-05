@@ -47,6 +47,13 @@
       ]
     },
     {
+      "name": "Coverage",
+      "inherits": [
+        "unix_base",
+        "Coverage_base"
+      ]
+    },
+    {
       "name": "Fuzzers",
       "inherits": [
         "unix_base",
@@ -56,6 +63,13 @@
   ],
   "buildPresets": [
     {
+      "name": "Coverage",
+      "inherits": "base",
+      "configurePreset": "Coverage",
+      "displayName": "Coverage Build",
+      "description": "Build the project with coverage instrumentation"
+    },
+    {
       "name": "Distribution",
       "inherits": "base",
       "configurePreset": "Distribution",
@@ -64,6 +78,11 @@
     }
   ],
   "testPresets": [
+    {
+      "name": "Coverage",
+      "inherits": "base",
+      "configurePreset": "Coverage"
+    },
     {
       "name": "Distribution",
       "inherits": "base",
