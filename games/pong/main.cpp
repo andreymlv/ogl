@@ -1,8 +1,10 @@
 //
-// Pong — minimal multiplayer with sound
+// Pong — solo, host/client multiplayer with sound
 //
 // Usage:
-//   ./pong host          -> start as host (left paddle, binds :7755)
+//   ./pong               -> solo mode (player vs AI)
+//   ./pong solo          -> solo mode (player vs AI)
+//   ./pong host          -> start as host (AI demo until client connects)
 //   ./pong <host_ip>     -> start as client (right paddle, connects to host)
 //
 
@@ -37,21 +39,32 @@ int main(int argc, char *argv[])
     QCoreApplication qtApp(argc, argv);
 
     const QStringList args = QCoreApplication::arguments();
-    if (args.size() < 2) {
-        qCritical("Usage:  pong host  |  pong <host_ip>");
-        return 1;
-    }
 
-    const bool isHost = (args.at(1) == u"host");
-    const QString hostIp = isHost ? QString{} : args.at(1);
+    PongLayer::Role role = PongLayer::Role::Solo;
+    QString hostIp;
+    if (args.size() >= 2) {
+        if (args.at(1) == u"host") {
+            role = PongLayer::Role::Host;
+        } else if (args.at(1) != u"solo") {
+            role = PongLayer::Role::Client;
+            hostIp = args.at(1);
+        }
+    }
 
     engine::GlfwContext glfwCtx;
     if (!glfwCtx.init()) {
         return 1;
     }
 
+    const char *title = "Pong — Solo (W/S)";
+    if (role == PongLayer::Role::Host) {
+        title = "Pong — Host (W/S)";
+    } else if (role == PongLayer::Role::Client) {
+        title = "Pong — Client (W/S)";
+    }
+
     auto window = std::make_unique<engine::GlfwWindow>();
-    if (!window->init(800, 600, isHost ? "Pong — Host (W/S)" : "Pong — Client (W/S)")) {
+    if (!window->init(800, 600, title)) {
         return 1;
     }
 
@@ -62,7 +75,7 @@ int main(int argc, char *argv[])
     if (!game.init(std::move(window), std::move(renderer), std::move(audio))) {
         return 1;
     }
-    if (!game.onInit(isHost ? PongLayer::Role::Host : PongLayer::Role::Client, hostIp)) {
+    if (!game.onInit(role, hostIp)) {
         return 1;
     }
 

@@ -11,6 +11,7 @@ permissions:
 
 env:
   PROJECT_SOURCE_DIR: ${{ github.workspace }}
+  LLVM_VERSION: 20
 
 jobs:
   build:
@@ -31,12 +32,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install LLVM apt repository (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /usr/share/keyrings/llvm-snapshot.gpg.key > /dev/null
+          UBUNTU_RELEASE=$(lsb_release -cs)
+          echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg.key] http://apt.llvm.org/${UBUNTU_RELEASE}/ llvm-toolchain-${UBUNTU_RELEASE}-${LLVM_VERSION} main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            clang clazy ninja-build pkg-config autoconf autoconf-archive automake libtool \
+            clang-${LLVM_VERSION} clazy ninja-build pkg-config autoconf autoconf-archive automake libtool \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libwayland-dev libwayland-egl-backend-dev wayland-protocols libxkbcommon-dev \
             libegl1-mesa-dev libgl1-mesa-dev libgl1-mesa-dri mesa-utils xvfb
@@ -58,7 +67,15 @@ jobs:
           path: build/distribution/vcpkg_installed
           key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}
 
-      - name: Configure
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        run: >
+          cmake --preset Distribution
+          -DCMAKE_C_COMPILER=clang-${LLVM_VERSION}
+          -DCMAKE_CXX_COMPILER=clang++-${LLVM_VERSION}
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
         run: cmake --preset Distribution
 
       - name: Build

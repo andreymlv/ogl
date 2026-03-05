@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <utility>
 
 struct PongEntities {
     engine::Entity ball;
@@ -52,6 +53,13 @@ inline PongEntities buildPongScene(engine::Scene &scene)
     ents.score2Bar.addComponent<engine::Sprite>().color = kBlue;
 
     return ents;
+}
+
+inline void flipPerspective(GameState &state)
+{
+    state.m_ball.m_x = -state.m_ball.m_x;
+    std::swap(state.m_p1Y, state.m_p2Y);
+    std::swap(state.m_score1, state.m_score2);
 }
 
 inline void syncPongScene(PongEntities &ents, const GameState &state)

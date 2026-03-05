@@ -27,14 +27,16 @@ void PongLayer::onAttach()
     // Build the scene — one entity per visual object.
     m_entities = buildPongScene(m_scene);
 
-    // Network socket
-    m_socket = new QUdpSocket(this);
-    if (m_role == Role::Host) {
-        m_socket->bind(QHostAddress::AnyIPv4, kHostPort);
-    } else {
-        m_socket->bind(QHostAddress::AnyIPv4, 0);
+    // Network socket (not needed for solo)
+    if (m_role != Role::Solo) {
+        m_socket = new QUdpSocket(this);
+        if (m_role == Role::Host) {
+            m_socket->bind(QHostAddress::AnyIPv4, kHostPort);
+        } else {
+            m_socket->bind(QHostAddress::AnyIPv4, 0);
+        }
+        QObject::connect(m_socket, &QUdpSocket::readyRead, this, &PongLayer::onReadyRead);
     }
-    QObject::connect(m_socket, &QUdpSocket::readyRead, this, &PongLayer::onReadyRead);
 }
 
 void PongLayer::onDetach()
@@ -47,12 +49,19 @@ void PongLayer::onDetach()
 
 void PongLayer::onUpdate(float dt)
 {
-    if (m_role == Role::Host) {
+    if (m_role == Role::Solo) {
+        soloUpdate(dt);
+    } else if (m_role == Role::Host) {
         hostUpdate(dt);
     } else {
         clientUpdate();
     }
-    syncPongScene(m_entities, m_state);
+
+    GameState renderState = m_state;
+    if (m_role == Role::Client) {
+        flipPerspective(renderState);
+    }
+    syncPongScene(m_entities, renderState);
 }
 
 void PongLayer::onRender()
@@ -76,12 +85,33 @@ void PongLayer::playScore()
     }
 }
 
+// ── Solo ─────────────────────────────────────────────────────────────────────
+
+void PongLayer::soloUpdate(float dt)
+{
+    m_state.m_p1Y = movePaddle(m_state.m_p1Y, localDir(), dt);
+    m_state.m_p2Y = movePaddle(m_state.m_p2Y, aiDirection(m_state.m_ball, m_state.m_p2Y, kRightPaddleX, dt, m_aiP2), dt);
+    const auto events = simulateBall(m_state, dt);
+    if (hasFlag(events, HitEvent::Wall) || hasFlag(events, HitEvent::Paddle)) {
+        playHit();
+    }
+    if (hasFlag(events, HitEvent::ScoreLeft) || hasFlag(events, HitEvent::ScoreRight)) {
+        playScore();
+    }
+}
+
 // ── Host ─────────────────────────────────────────────────────────────────────
 
 void PongLayer::hostUpdate(float dt)
 {
-    m_state.m_p1Y = movePaddle(m_state.m_p1Y, localDir(), dt);
-    m_state.m_p2Y = movePaddle(m_state.m_p2Y, m_remoteDir, dt);
+    if (m_clientConnected) {
+        m_state.m_p1Y = movePaddle(m_state.m_p1Y, localDir(), dt);
+        m_state.m_p2Y = movePaddle(m_state.m_p2Y, m_remoteDir, dt);
+    } else {
+        // Demo mode: both paddles AI-controlled
+        m_state.m_p1Y = movePaddle(m_state.m_p1Y, aiDirection(m_state.m_ball, m_state.m_p1Y, kLeftPaddleX, dt, m_aiP1), dt);
+        m_state.m_p2Y = movePaddle(m_state.m_p2Y, aiDirection(m_state.m_ball, m_state.m_p2Y, kRightPaddleX, dt, m_aiP2), dt);
+    }
     const auto events = simulateBall(m_state, dt);
     if (hasFlag(events, HitEvent::Wall) || hasFlag(events, HitEvent::Paddle)) {
         playHit();
@@ -126,6 +156,13 @@ void PongLayer::onReadyRead()
         const QNetworkDatagram dg = m_socket->receiveDatagram();
 
         if (m_role == Role::Host) {
+            if (!m_clientConnected) {
+                m_clientConnected = true;
+                m_state = GameState{};
+                resetBall(m_state, 1.0F);
+                m_aiP1 = AiState{};
+                m_aiP2 = AiState{};
+            }
             m_clientAddress = dg.senderAddress();
             m_clientPort = static_cast<quint16>(dg.senderPort());
             InputPacket pkt;

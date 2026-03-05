@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ai.h"
 #include "pongscene.h"
 
 #include <audioclip.h>
@@ -21,6 +22,7 @@ class PongLayer : public engine::Layer, public QObject
 {
 public:
     enum class Role : quint8 {
+        Solo,
         Host,
         Client
     };
@@ -35,6 +37,9 @@ public:
 private:
     void playHit();
     void playScore();
+
+    // Solo
+    void soloUpdate(float dt);
 
     // Host
     void hostUpdate(float dt);
@@ -70,7 +75,12 @@ private:
     QHostAddress m_clientAddress;
     quint16 m_clientPort = 0;
     Direction m_remoteDir = Direction::Idle;
+    bool m_clientConnected = false;
 
     // Client
     QHostAddress m_hostAddress;
+
+    // AI
+    AiState m_aiP1;
+    AiState m_aiP2;
 };

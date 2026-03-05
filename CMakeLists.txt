@@ -29,6 +29,10 @@ include(ECMAddTests)
 include(ECMQtDeclareLoggingCategory)
 include(ECMCoverageOption)
 
+# KDECMakeSettings sets CMAKE_WIN32_EXECUTABLE ON by default (for KDE GUI apps).
+# Our executables use main(), not WinMain, so turn it off.
+set(CMAKE_WIN32_EXECUTABLE OFF)
+
 if(BUILD_COVERAGE)
     find_program(GCOVR gcovr)
     if(GCOVR)
