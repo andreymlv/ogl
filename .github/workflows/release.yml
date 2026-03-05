@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PROJECT_SOURCE_DIR: ${{ github.workspace }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: Linux
+            artifact: ogl-linux-x64.tar.gz
+          - os: windows-latest
+            name: Windows
+            artifact: ogl-windows-x64.zip
+
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang clazy ninja-build pkg-config \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libwayland-egl-backend-dev wayland-protocols libxkbcommon-dev \
+            libegl1-mesa-dev libgl1-mesa-dev libgl1-mesa-dri mesa-utils xvfb
+
+      - name: Install LLVM (Windows)
+        if: runner.os == 'Windows'
+        run: choco install llvm --yes
+
+      - uses: lukka/get-cmake@latest
+
+      - uses: lukka/run-vcpkg@v11
+
+      - name: Configure
+        run: cmake --preset Distribution
+
+      - name: Build
+        run: cmake --build --preset Distribution
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p staging
+          cp build/distribution/games/pong/pong staging/
+          cp build/distribution/games/flappybird/flappybird staging/
+          cp build/distribution/examples/01_window/example_01_window staging/
+          cp build/distribution/examples/02_triangle/example_02_triangle staging/
+          cp build/distribution/examples/03_texture/example_03_texture staging/
+          cp -r games/flappybird/audio staging/
+          cp -r games/flappybird/sprites staging/
+          tar -czf ogl-linux-x64.tar.gz -C staging .
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path staging
+          Copy-Item build/distribution/games/pong/pong.exe staging/
+          Copy-Item build/distribution/games/flappybird/flappybird.exe staging/
+          Copy-Item build/distribution/examples/01_window/example_01_window.exe staging/
+          Copy-Item build/distribution/examples/02_triangle/example_02_triangle.exe staging/
+          Copy-Item build/distribution/examples/03_texture/example_03_texture.exe staging/
+          Copy-Item -Recurse games/flappybird/audio staging/
+          Copy-Item -Recurse games/flappybird/sprites staging/
+          Compress-Archive -Path staging/* -DestinationPath ogl-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Prepare nightly tag
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: |
+          gh release delete nightly --yes --cleanup-tag || true
+          git tag -f nightly
+          git push origin nightly --force
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release (stable)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            ogl-linux-x64.tar.gz
+            ogl-windows-x64.zip
+
+      - name: Create release (nightly)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          prerelease: true
+          name: Nightly Build
+          body: |
+            Automated nightly build from master branch.
+            Commit: ${{ github.sha }}
+          files: |
+            ogl-linux-x64.tar.gz
+            ogl-windows-x64.zip

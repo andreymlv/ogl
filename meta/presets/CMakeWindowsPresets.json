@@ -57,6 +57,31 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
+    },
+    {
+      "name": "Distribution",
+      "inherits": [
+        "windows_base",
+        "Distribution_base"
+      ],
+      "displayName": "Windows Distribution Config",
+      "description": "Windows distribution build with static libraries"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "Distribution",
+      "inherits": "base",
+      "configurePreset": "Distribution",
+      "displayName": "Distribution Build",
+      "description": "Build the project for distribution"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "Distribution",
+      "inherits": "base",
+      "configurePreset": "Distribution"
     }
   ]
 }
