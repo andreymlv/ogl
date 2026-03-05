@@ -12,7 +12,8 @@
         "VCPKG_INSTALL_OPTIONS": "--no-print-usage"
       },
       "environment": {
-        "PROJECT_SOURCE_DIR": "${fileDir}/../.."
+        "PROJECT_SOURCE_DIR": "${fileDir}/../..",
+        "VCPKG_BINARY_SOURCES": "clear;files,$env{PROJECT_SOURCE_DIR}/build/caches/vcpkg-binary-cache,readwrite;$penv{VCPKG_BINARY_SOURCES}"
       },
       "vendor": {
         "jetbrains.com/clion": {

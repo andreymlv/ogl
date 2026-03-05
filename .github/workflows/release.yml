@@ -61,11 +61,15 @@ jobs:
 
       - uses: lukka/run-vcpkg@v11
 
-      - name: Cache vcpkg installed packages
-        uses: actions/cache@v4
+      - name: Restore vcpkg binary cache
+        uses: actions/cache/restore@v4
+        id: vcpkg-cache
         with:
-          path: build/distribution/vcpkg_installed
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}
+          path: build/caches/vcpkg-binary-cache
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-
+            vcpkg-${{ runner.os }}-
 
       - name: Configure (Linux)
         if: runner.os == 'Linux'
@@ -80,6 +84,13 @@ jobs:
 
       - name: Build
         run: cmake --build --preset Distribution
+
+      - name: Save vcpkg binary cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: build/caches/vcpkg-binary-cache
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-${{ github.run_id }}
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
