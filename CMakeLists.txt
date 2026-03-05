@@ -29,6 +29,21 @@ include(ECMAddTests)
 include(ECMQtDeclareLoggingCategory)
 include(ECMCoverageOption)
 
+# Auto-detect ccache for faster recompilation
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_C_COMPILER_LAUNCHER   ${CCACHE_PROGRAM})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+endif()
+
+# Auto-detect mold for faster linking (Linux only, skip if linker already requested)
+if(UNIX AND NOT APPLE AND NOT CMAKE_EXE_LINKER_FLAGS MATCHES "-fuse-ld")
+    find_program(MOLD_PROGRAM mold)
+    if(MOLD_PROGRAM)
+        add_link_options(-fuse-ld=mold)
+    endif()
+endif()
+
 # KDECMakeSettings sets CMAKE_WIN32_EXECUTABLE ON by default (for KDE GUI apps).
 # Our executables use main(), not WinMain, so turn it off.
 set(CMAKE_WIN32_EXECUTABLE OFF)

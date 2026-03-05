@@ -29,6 +29,10 @@ jobs:
     name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
 
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/build/caches/ccache
+      CCACHE_MAXSIZE: 500M
+
     steps:
       - uses: actions/checkout@v6
 
@@ -48,16 +52,24 @@ jobs:
             clang-${LLVM_VERSION} clazy ninja-build pkg-config autoconf autoconf-archive automake libtool \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libwayland-dev libwayland-egl-backend-dev wayland-protocols libxkbcommon-dev \
-            libegl1-mesa-dev libgl1-mesa-dev libgl1-mesa-dri mesa-utils xvfb
+            libegl1-mesa-dev libgl1-mesa-dev libgl1-mesa-dri mesa-utils xvfb \
+            ccache mold
 
       - name: Install LLVM (Windows)
         if: runner.os == 'Windows'
-        run: choco install llvm --yes
+        run: choco install llvm ccache --yes
 
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
 
       - uses: lukka/get-cmake@latest
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/caches/ccache
+          key: ccache-${{ matrix.name }}-${{ github.run_id }}
+          restore-keys: ccache-${{ matrix.name }}-
 
       - name: Restore vcpkg binary cache
         uses: actions/cache/restore@v4
@@ -92,6 +104,13 @@ jobs:
         with:
           path: build/caches/vcpkg-binary-cache
           key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-${{ github.run_id }}
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: build/caches/ccache
+          key: ccache-${{ matrix.name }}-${{ github.run_id }}
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
@@ -133,6 +152,8 @@ jobs:
     env:
       PROJECT_SOURCE_DIR: ${{ github.workspace }}
       VCPKG_FORCE_SYSTEM_BINARIES: 1
+      CCACHE_DIR: ${{ github.workspace }}/build/caches/ccache
+      CCACHE_MAXSIZE: 500M
 
     steps:
       - name: Install system dependencies
@@ -143,10 +164,17 @@ jobs:
             autoconf autoconf-archive automake libtool \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             wayland-dev wayland-protocols-dev libxkbcommon-dev \
-            mesa-dev perl bash
+            mesa-dev perl bash ccache mold
           pip install --break-system-packages cmake
 
       - uses: actions/checkout@v6
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/caches/ccache
+          key: ccache-musl-${{ github.run_id }}
+          restore-keys: ccache-musl-
 
       - name: Restore vcpkg binary cache
         uses: actions/cache/restore@v4
@@ -179,6 +207,13 @@ jobs:
         with:
           path: build/caches/vcpkg-binary-cache
           key: vcpkg-musl-${{ hashFiles('vcpkg.json', 'meta/vcpkg/**/*.cmake') }}-${{ github.run_id }}
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: build/caches/ccache
+          key: ccache-musl-${{ github.run_id }}
 
       - name: Package
         run: |
