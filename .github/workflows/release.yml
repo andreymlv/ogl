@@ -45,6 +45,9 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install llvm --yes
 
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+
       - uses: lukka/get-cmake@latest
 
       - uses: lukka/run-vcpkg@v11
