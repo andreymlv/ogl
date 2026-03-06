@@ -2,6 +2,7 @@
 
 #include "constants.h"
 #include "flappyscene.h"
+#include "onnxinference.h"
 #include "physics.h"
 
 #include <audioclip.h>
@@ -76,7 +77,9 @@ private:
     bool m_aWasPressed = false;
 
     // AI autoplay
-    bool m_aiEnabled = false;
+    enum class AiMode { Off, Heuristic, ML };
+    AiMode m_aiMode = AiMode::Off;
+    OnnxInference m_mlModel;
 
     // Game over delay before restart
     float m_gameOverTimer = 0.F;

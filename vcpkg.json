@@ -7,6 +7,7 @@
     "glad",
     "glm",
     "miniaudio",
+    "onnxruntime",
     "stb",
     {
       "name": "glfw3",

@@ -1,0 +1,28 @@
+diff --git a/onnxruntime/core/common/semver.h b/onnxruntime/core/common/semver.h
+index abcdef1..abcdef2 100644
+--- a/onnxruntime/core/common/semver.h
++++ b/onnxruntime/core/common/semver.h
+@@ -3,6 +3,7 @@
+
+ #pragma once
+
++#include <cstdint>
+ #include <optional>
+ #include <string_view>
+
+diff --git a/onnxruntime/core/common/spin_pause.cc b/onnxruntime/core/common/spin_pause.cc
+index abcdef1..abcdef2 100644
+--- a/onnxruntime/core/common/spin_pause.cc
++++ b/onnxruntime/core/common/spin_pause.cc
+@@ -35,7 +35,10 @@ void SpinPause() {
+ #if defined(_WIN32)
+     _tpause(0x0, __rdtsc() + tpause_spin_delay_cycles);
+ #elif defined(__linux__)
+-    __builtin_ia32_tpause(0x0, __rdtsc() + tpause_spin_delay_cycles);
++    uint64_t deadline = __rdtsc() + tpause_spin_delay_cycles;
++    uint32_t lo = static_cast<uint32_t>(deadline);
++    uint32_t hi = static_cast<uint32_t>(deadline >> 32);
++    __builtin_ia32_tpause(0x0, hi, lo);
+ #else
+     _mm_pause();
+ #endif

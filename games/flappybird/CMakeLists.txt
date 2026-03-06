@@ -1,6 +1,7 @@
 add_executable(flappybird)
-target_sources(flappybird PRIVATE main.cpp flappylayer.cpp)
-target_link_libraries(flappybird PRIVATE engine Qt::Core)
+target_sources(flappybird PRIVATE main.cpp flappylayer.cpp onnxinference.cpp)
+target_link_libraries(flappybird PRIVATE engine Qt::Core onnxruntime::onnxruntime)
+kde_source_files_enable_exceptions(onnxinference.cpp)
 
 qt_add_resources(flappybird "flappybird_assets"
     PREFIX "/"
@@ -29,4 +30,5 @@ qt_add_resources(flappybird "flappybird_assets"
         audio/hit.wav
         audio/die.wav
         audio/swoosh.wav
+        model.onnx
 )

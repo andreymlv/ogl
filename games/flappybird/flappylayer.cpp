@@ -1,6 +1,7 @@
 #include "flappylayer.h"
 
 #include "ai.h"
+#include "mlai.h"
 
 #include <QFile>
 
@@ -60,6 +61,14 @@ void FlappyLayer::onAttach()
     m_dieClip = loadAudio(QStringLiteral("audio/die.wav"));
     m_swooshClip = loadAudio(QStringLiteral("audio/swoosh.wav"));
 
+    // Load ML model from embedded Qt resource
+    QFile modelFile(QStringLiteral(":/model.onnx"));
+    if (modelFile.open(QIODevice::ReadOnly)) {
+        const QByteArray modelData = modelFile.readAll();
+        m_mlModel.initFromData(reinterpret_cast<const unsigned char *>(modelData.constData()),
+                               static_cast<std::size_t>(modelData.size()));
+    }
+
     // Build scene
     m_entities = buildFlappyScene(m_scene, m_textures);
 
@@ -92,7 +101,17 @@ void FlappyLayer::onUpdate(float dt)
     const bool aPressed = aDown && !m_aWasPressed;
     m_aWasPressed = aDown;
     if (aPressed) {
-        m_aiEnabled = !m_aiEnabled;
+        switch (m_aiMode) {
+        case AiMode::Off:
+            m_aiMode = AiMode::Heuristic;
+            break;
+        case AiMode::Heuristic:
+            m_aiMode = m_mlModel.isValid() ? AiMode::ML : AiMode::Off;
+            break;
+        case AiMode::ML:
+            m_aiMode = AiMode::Off;
+            break;
+        }
     }
 
     // Bird animation — always active
@@ -117,7 +136,7 @@ void FlappyLayer::onUpdate(float dt)
         m_birdY = kBirdStartY + std::sin(m_bobTimer * 3.F) * 8.F;
         m_birdVy = 0.F;
 
-        if (spacePressed || m_aiEnabled) {
+        if (spacePressed || m_aiMode != AiMode::Off) {
             m_phase = GamePhase::Playing;
             m_birdY = kBirdStartY;
             flap(m_birdVy);
@@ -155,7 +174,13 @@ void FlappyLayer::onUpdate(float dt)
             }
         }
 
-        if (spacePressed || (m_aiEnabled && aiShouldFlap(m_birdY, m_birdVy, m_pipeState))) {
+        bool aiFlap = false;
+        if (m_aiMode == AiMode::Heuristic) {
+            aiFlap = aiShouldFlap(m_birdY, m_birdVy, m_pipeState);
+        } else if (m_aiMode == AiMode::ML && m_mlModel.isValid()) {
+            aiFlap = mlShouldFlap(m_mlModel, m_birdY, m_birdVy, m_pipeState);
+        }
+        if (spacePressed || aiFlap) {
             flap(m_birdVy);
             if (m_wingClip) {
                 m_wingClip->play();
@@ -174,7 +199,7 @@ void FlappyLayer::onUpdate(float dt)
         }
 
         m_gameOverTimer += dt;
-        if ((spacePressed || m_aiEnabled) && m_gameOverTimer > 0.5F) {
+        if ((spacePressed || m_aiMode != AiMode::Off) && m_gameOverTimer > 0.5F) {
             // Reset game
             m_phase = GamePhase::Ready;
             m_birdY = kBirdStartY;
