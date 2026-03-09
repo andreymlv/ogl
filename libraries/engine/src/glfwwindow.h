@@ -56,7 +56,14 @@ public:
 
     bool isKeyPressed(Key key) const override;
 
+    bool isGamepadConnected(int slot = 0) const override;
+    bool isGamepadButtonPressed(GamepadButton button, int slot = 0) const override;
+    float gamepadAxis(GamepadAxis axis, int slot = 0) const override;
+    int firstGamepadSlot() const override;
+
     void setResizeCallback(std::function<void(int, int)> callback) override;
+
+    void *nativeHandle() const override;
 
 private:
     std::unique_ptr<GlfwWindowPrivate> d;

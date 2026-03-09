@@ -45,9 +45,31 @@ public:
         return false;
     }
 
+    bool isGamepadConnected(int /*slot*/) const override
+    {
+        return false;
+    }
+    bool isGamepadButtonPressed(engine::GamepadButton /*button*/, int /*slot*/) const override
+    {
+        return false;
+    }
+    float gamepadAxis(engine::GamepadAxis /*axis*/, int /*slot*/) const override
+    {
+        return 0.0F;
+    }
+    int firstGamepadSlot() const override
+    {
+        return -1;
+    }
+
     void setResizeCallback(std::function<void(int, int)> callback) override
     {
         m_resizeCallback = std::move(callback);
+    }
+
+    void *nativeHandle() const override
+    {
+        return nullptr;
     }
 
     std::function<void(int, int)> m_resizeCallback;
@@ -71,6 +93,12 @@ public:
     void endFrame() override
     {
         ++m_endCount;
+    }
+    void beginImGui() override
+    {
+    }
+    void endImGui() override
+    {
     }
     void onResize(int, int) override
     {

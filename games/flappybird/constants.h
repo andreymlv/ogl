@@ -38,5 +38,10 @@ inline constexpr float kFloorY = kBaseH;
 inline constexpr float kDigitW = 24.F;
 inline constexpr float kDigitH = 36.F;
 inline constexpr float kDigitY = 450.F;
+inline constexpr float kHiScoreDigitY = 410.F;
+inline constexpr float kHiScoreDigitScale = 0.7F;
 inline constexpr int kMaxDigits = 3;
 
+// ── Parallax ────────────────────────────────────────────────────────────────
+
+inline constexpr float kBgScrollSpeed = kPipeSpeed * 0.3F; // background scrolls slower

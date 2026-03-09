@@ -27,6 +27,8 @@ public:
 int main(int argc, char *argv[])
 {
     QCoreApplication qtApp(argc, argv);
+    qtApp.setOrganizationName(QStringLiteral("FlappyBird"));
+    qtApp.setApplicationName(QStringLiteral("FlappyBird"));
 
     engine::GlfwContext glfwCtx;
     if (!glfwCtx.init()) {

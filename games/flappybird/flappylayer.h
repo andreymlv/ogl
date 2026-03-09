@@ -13,6 +13,7 @@
 #include <window.h>
 
 #include <QObject>
+#include <QSettings>
 
 #include <array>
 #include <memory>
@@ -54,6 +55,8 @@ private:
     float m_birdY = kBirdStartY;
     float m_birdVy = 0.F;
     int m_score = 0;
+    int m_hiScore = 0;
+    QSettings m_settings{QStringLiteral("FlappyBird"), QStringLiteral("FlappyBird")};
 
     // Bird animation
     int m_birdFrame = 0;
@@ -64,6 +67,9 @@ private:
 
     // Ground scroll
     float m_baseOffset = 0.F;
+
+    // Background parallax scroll
+    float m_bgOffset = 0.F;
 
     // Pipe state
     std::array<PipeState, kPipeCount> m_pipeState{};
@@ -85,4 +91,7 @@ private:
 
     // Game over delay before restart
     float m_gameOverTimer = 0.F;
+
+    // Cached gamepad slot (-1 = none found)
+    int m_gamepadSlot = -1;
 };

@@ -68,11 +68,13 @@ bool Application::init(std::unique_ptr<Window> window, std::unique_ptr<Renderer>
         d->m_renderer->onResize(width, height);
     });
 
+    qCDebug(Engine) << "Application initialized";
     return true;
 }
 
 int Application::run()
 {
+    qCDebug(Engine) << "Starting game loop";
     d->m_frameTimer.start();
 
     QTimer loop;
@@ -127,6 +129,7 @@ void Application::onRender()
 void Application::tick()
 {
     if (d->m_window->shouldClose()) {
+        qCDebug(Engine) << "Window close requested, shutting down";
         QCoreApplication::quit();
         return;
     }
@@ -139,7 +142,9 @@ void Application::tick()
     onUpdate(dt);
 
     d->m_renderer->beginFrame();
+    d->m_renderer->beginImGui();
     onRender();
+    d->m_renderer->endImGui();
     d->m_renderer->endFrame();
 
     d->m_window->swapBuffers();

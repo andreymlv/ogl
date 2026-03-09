@@ -2,6 +2,10 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <QLoggingCategory>
+
+#include "engine_logging.h"
+
 namespace engine
 {
 
@@ -29,6 +33,7 @@ Camera2D::Camera2D(float left, float right, float bottom, float top)
 {
     d->m_projection = glm::ortho(left, right, bottom, top);
     d->recalculate();
+    qCDebug(Engine) << "Camera2D created: bounds [" << left << right << bottom << top << "]";
 }
 
 Camera2D::~Camera2D() = default;
@@ -47,6 +52,7 @@ void Camera2D::setRotation(float degrees)
 
 void Camera2D::setZoom(float zoom)
 {
+    qCDebug(Engine) << "Camera2D zoom set to" << zoom;
     d->m_zoom = zoom;
     d->recalculate();
 }

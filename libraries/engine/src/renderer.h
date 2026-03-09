@@ -25,6 +25,10 @@ public:
     // Called at the end of each frame — flush draw calls, end render pass, etc.
     virtual void endFrame() = 0;
 
+    // Start / finish the ImGui frame. Game layers call ImGui:: between these.
+    virtual void beginImGui() = 0;
+    virtual void endImGui() = 0;
+
     // Called when the window is resized.
     virtual void onResize(int width, int height) = 0;
 

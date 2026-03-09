@@ -4,6 +4,13 @@
     "assimp",
     "ecm",
     "entt",
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding",
+        "opengl3-binding"
+      ]
+    },
     "glad",
     "glm",
     "miniaudio",

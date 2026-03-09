@@ -32,6 +32,7 @@ target_link_libraries(engine
         glad::glad
         glm::glm
         EnTT::EnTT
+        imgui::imgui
         Qt::Core
 )
 

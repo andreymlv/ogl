@@ -59,9 +59,7 @@ static bool uploadPixels(TexturePrivate &priv, unsigned char *pixels, int width,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(format),
-                 width, height, 0,
-                 format, GL_UNSIGNED_BYTE, pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(format), width, height, 0, format, GL_UNSIGNED_BYTE, pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -69,6 +67,7 @@ static bool uploadPixels(TexturePrivate &priv, unsigned char *pixels, int width,
     priv.m_width = width;
     priv.m_height = height;
     priv.m_valid = true;
+    qCDebug(Engine) << "Texture uploaded:" << width << "x" << height << "channels =" << channels << "GL id =" << id;
     return true;
 }
 
@@ -92,6 +91,9 @@ bool Texture::init(std::string_view path)
 
     const bool ok = uploadPixels(*d, data, w, h, channels);
     stbi_image_free(data);
+    if (ok) {
+        qCDebug(Engine) << "Texture loaded from file:" << path.data();
+    }
     return ok;
 }
 
@@ -115,6 +117,9 @@ bool Texture::initFromData(const unsigned char *data, int size)
 
     const bool ok = uploadPixels(*d, pixels, w, h, channels);
     stbi_image_free(pixels);
+    if (ok) {
+        qCDebug(Engine) << "Texture decoded from memory:" << w << "x" << h;
+    }
     return ok;
 }
 

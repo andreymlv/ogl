@@ -44,6 +44,7 @@ static GlShader compileShader(GLenum type, std::string_view src)
         qCCritical(Engine) << "Shader compile error:" << log.c_str();
         return GlShader{0}; // shader destructor cleans up
     }
+    qCDebug(Engine) << ((type == GL_VERTEX_SHADER) ? "Vertex" : "Fragment") << "shader compiled";
     return shader;
 }
 
@@ -87,6 +88,7 @@ bool Shader::init(std::string_view vertSrc, std::string_view fragSrc)
     }
 
     d->m_program = std::move(program);
+    qCDebug(Engine) << "Shader program linked, id =" << d->m_program.id();
     return true;
 }
 

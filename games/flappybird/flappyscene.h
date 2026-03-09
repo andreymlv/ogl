@@ -20,7 +20,8 @@ struct PipePair {
 };
 
 struct FlappyEntities {
-    engine::Entity background;
+    engine::Entity background1;
+    engine::Entity background2;
     engine::Entity bird;
     engine::Entity base1;
     engine::Entity base2;
@@ -28,6 +29,7 @@ struct FlappyEntities {
     engine::Entity gameover;
     std::array<PipePair, kPipeCount> pipes;
     std::array<engine::Entity, kMaxDigits> digits;
+    std::array<engine::Entity, kMaxDigits> hiScoreDigits;
 };
 
 // ── Build scene ─────────────────────────────────────────────────────────────
@@ -46,14 +48,22 @@ inline FlappyEntities buildFlappyScene(engine::Scene &scene, const FlappyTexture
 {
     FlappyEntities ents;
 
-    // Background — zOrder 0
-    ents.background = scene.createEntity("background");
-    auto &bgTf = ents.background.addComponent<engine::Transform>();
-    bgTf.position = {0.F, 0.F};
-    bgTf.scale = {kWorldW, kWorldH};
-    auto &bgSp = ents.background.addComponent<engine::Sprite>();
-    bgSp.texture = tex.background;
-    bgSp.zOrder = 0;
+    // Background — zOrder 0 (two tiles for parallax scroll)
+    ents.background1 = scene.createEntity("background1");
+    auto &bg1Tf = ents.background1.addComponent<engine::Transform>();
+    bg1Tf.position = {0.F, 0.F};
+    bg1Tf.scale = {kWorldW, kWorldH};
+    auto &bg1Sp = ents.background1.addComponent<engine::Sprite>();
+    bg1Sp.texture = tex.background;
+    bg1Sp.zOrder = 0;
+
+    ents.background2 = scene.createEntity("background2");
+    auto &bg2Tf = ents.background2.addComponent<engine::Transform>();
+    bg2Tf.position = {kWorldW, 0.F};
+    bg2Tf.scale = {kWorldW, kWorldH};
+    auto &bg2Sp = ents.background2.addComponent<engine::Sprite>();
+    bg2Sp.texture = tex.background;
+    bg2Sp.zOrder = 0;
 
     // Pipes — zOrder 1
     for (int i = 0; i < kPipeCount; ++i) {
@@ -138,6 +148,17 @@ inline FlappyEntities buildFlappyScene(engine::Scene &scene, const FlappyTexture
         dsp.zOrder = 4;
     }
 
+    // High-score digits — zOrder 4, smaller
+    for (int i = 0; i < kMaxDigits; ++i) {
+        ents.hiScoreDigits[static_cast<std::size_t>(i)] = scene.createEntity("hi_digit");
+        auto &dtf = ents.hiScoreDigits[static_cast<std::size_t>(i)].addComponent<engine::Transform>();
+        dtf.position = {0.F, kHiScoreDigitY};
+        dtf.scale = {0.F, 0.F}; // hidden initially
+        auto &dsp = ents.hiScoreDigits[static_cast<std::size_t>(i)].addComponent<engine::Sprite>();
+        dsp.texture = tex.digitTex[0];
+        dsp.zOrder = 4;
+    }
+
     return ents;
 }
 
@@ -155,9 +176,15 @@ inline void syncFlappyScene(FlappyEntities &ents,
                             float birdRotation,
                             int birdFrame,
                             float baseOffset,
+                            float bgOffset,
                             GamePhase phase,
-                            int score)
+                            int score,
+                            int hiScore)
 {
+    // Background parallax scroll
+    ents.background1.getComponent<engine::Transform>().position.x = -bgOffset;
+    ents.background2.getComponent<engine::Transform>().position.x = kWorldW - bgOffset;
+
     // Bird
     auto &birdTf = ents.bird.getComponent<engine::Transform>();
     birdTf.position = {kBirdX, birdY};
@@ -205,6 +232,28 @@ inline void syncFlappyScene(FlappyEntities &ents,
             const int digit = scoreStr[static_cast<std::size_t>(i)] - '0';
             dtf.position = {startX + static_cast<float>(i) * kDigitW, kDigitY};
             dtf.scale = {kDigitW, kDigitH};
+            dsp.texture = tex.digitTex[static_cast<std::size_t>(digit)];
+        } else {
+            dtf.scale = {0.F, 0.F};
+        }
+    }
+
+    // High-score digits — shown during Playing and GameOver, smaller and below the score
+    const bool showHiScore = (phase == GamePhase::Playing || phase == GamePhase::GameOver) && hiScore > 0;
+    const auto hiStr = std::to_string(hiScore);
+    const auto hiNumDigits = static_cast<int>(hiStr.size());
+    const float hiDigitW = kDigitW * kHiScoreDigitScale;
+    const float hiDigitH = kDigitH * kHiScoreDigitScale;
+    const float hiTotalW = static_cast<float>(hiNumDigits) * hiDigitW;
+    const float hiStartX = (kWorldW - hiTotalW) / 2.F;
+
+    for (int i = 0; i < kMaxDigits; ++i) {
+        auto &dtf = ents.hiScoreDigits[static_cast<std::size_t>(i)].getComponent<engine::Transform>();
+        auto &dsp = ents.hiScoreDigits[static_cast<std::size_t>(i)].getComponent<engine::Sprite>();
+        if (showHiScore && i < hiNumDigits) {
+            const int digit = hiStr[static_cast<std::size_t>(i)] - '0';
+            dtf.position = {hiStartX + static_cast<float>(i) * hiDigitW, kHiScoreDigitY};
+            dtf.scale = {hiDigitW, hiDigitH};
             dsp.texture = tex.digitTex[static_cast<std::size_t>(digit)];
         } else {
             dtf.scale = {0.F, 0.F};

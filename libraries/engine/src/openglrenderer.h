@@ -28,6 +28,8 @@ public:
 
     void beginFrame() override;
     void endFrame() override;
+    void beginImGui() override;
+    void endImGui() override;
     void onResize(int width, int height) override;
 
 private:

@@ -197,6 +197,7 @@ bool Renderer2D::init()
 
     d->m_vertices.reserve(kMaxQuads * kVerticesPerQuad);
     d->m_valid = true;
+    qCDebug(Engine) << "Renderer2D initialized: max quads =" << kMaxQuads << ", max texture slots =" << kMaxTextureSlots;
     return true;
 }
 
@@ -265,17 +266,18 @@ void Renderer2D::drawSprite(glm::vec2 position, glm::vec2 size, const Texture &t
     // Corner offsets from center: BL, BR, TR, TL
     const glm::vec2 offsets[4] = {
         {-halfSize.x, -halfSize.y},
-        { halfSize.x, -halfSize.y},
-        { halfSize.x,  halfSize.y},
-        {-halfSize.x,  halfSize.y},
+        {halfSize.x, -halfSize.y},
+        {halfSize.x, halfSize.y},
+        {-halfSize.x, halfSize.y},
     };
 
     glm::vec2 corners[4];
     for (int i = 0; i < 4; ++i) {
-        corners[i] = center + glm::vec2{
-            offsets[i].x * cosA - offsets[i].y * sinA,
-            offsets[i].x * sinA + offsets[i].y * cosA,
-        };
+        corners[i] = center
+            + glm::vec2{
+                offsets[i].x * cosA - offsets[i].y * sinA,
+                offsets[i].x * sinA + offsets[i].y * cosA,
+            };
     }
 
     d->m_vertices.push_back({corners[0], kWhite, {0.F, 0.F}, slot});

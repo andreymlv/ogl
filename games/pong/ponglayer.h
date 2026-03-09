@@ -27,6 +27,12 @@ public:
         Client
     };
 
+    enum class Phase : quint8 {
+        Ready,
+        Playing,
+        GameOver
+    };
+
     PongLayer(engine::Window &window, engine::AudioEngine &audio, Role role, const QString &hostIp);
 
     void onAttach() override;
@@ -37,6 +43,7 @@ public:
 private:
     void playHit();
     void playScore();
+    void resetGame();
 
     // Solo
     void soloUpdate(float dt);
@@ -51,12 +58,14 @@ private:
     // Shared
     Direction localDir() const;
     void onReadyRead();
+    void renderImGui();
 
     // ── Members ──────────────────────────────────────────────────────────────
 
     engine::Window &m_window;
     engine::AudioEngine &m_audio;
     Role m_role;
+    Phase m_phase = Phase::Ready;
 
     GameState m_state;
     engine::Scene m_scene;
@@ -83,4 +92,13 @@ private:
     // AI
     AiState m_aiP1;
     AiState m_aiP2;
+
+    // Client-side sound: previous state for diff detection
+    GameState m_prevState;
+
+    // Input debounce
+    bool m_spaceWasPressed = false;
+
+    // Cached gamepad slot (-1 = none found)
+    int m_gamepadSlot = -1;
 };

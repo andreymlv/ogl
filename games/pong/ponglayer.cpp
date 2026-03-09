@@ -1,6 +1,8 @@
 #include "ponglayer.h"
 #include "physics.h"
 
+#include <imgui.h>
+
 #include <QNetworkDatagram>
 #include <QUdpSocket>
 
@@ -49,11 +51,44 @@ void PongLayer::onDetach()
 
 void PongLayer::onUpdate(float dt)
 {
-    if (m_role == Role::Solo) {
-        soloUpdate(dt);
-    } else if (m_role == Role::Host) {
-        hostUpdate(dt);
-    } else {
+    // Discover the first connected gamepad (slot may change at runtime)
+    m_gamepadSlot = m_window.firstGamepadSlot();
+
+    // Space / gamepad A / Start edge detection (press, not hold)
+    bool spaceDown = m_window.isKeyPressed(engine::Key::Space);
+    if (m_gamepadSlot >= 0) {
+        spaceDown = spaceDown || m_window.isGamepadButtonPressed(engine::GamepadButton::A, m_gamepadSlot)
+            || m_window.isGamepadButtonPressed(engine::GamepadButton::Start, m_gamepadSlot);
+    }
+    const bool spacePressed = spaceDown && !m_spaceWasPressed;
+    m_spaceWasPressed = spaceDown;
+
+    // Phase transitions
+    if (m_phase == Phase::Ready && spacePressed) {
+        m_phase = Phase::Playing;
+        resetGame();
+    } else if (m_phase == Phase::GameOver && spacePressed) {
+        m_phase = Phase::Ready;
+    }
+
+    // Only simulate when playing
+    if (m_phase == Phase::Playing) {
+        if (m_role == Role::Solo) {
+            soloUpdate(dt);
+        } else if (m_role == Role::Host) {
+            hostUpdate(dt);
+        } else {
+            clientUpdate();
+        }
+
+        // Check win condition (solo / host only — client follows host state)
+        if (m_role != Role::Client) {
+            if (m_state.m_score1 >= static_cast<qint32>(kMaxScore) || m_state.m_score2 >= static_cast<qint32>(kMaxScore)) {
+                m_phase = Phase::GameOver;
+            }
+        }
+    } else if (m_role == Role::Client) {
+        // Client still sends input and receives state even when not "playing" locally
         clientUpdate();
     }
 
@@ -67,6 +102,7 @@ void PongLayer::onUpdate(float dt)
 void PongLayer::onRender()
 {
     m_scene.onRender(m_r2d, m_cam);
+    renderImGui();
 }
 
 // ── Sound helpers ────────────────────────────────────────────────────────────
@@ -82,6 +118,78 @@ void PongLayer::playScore()
 {
     if (m_scoreClip) {
         m_scoreClip->play();
+    }
+}
+
+void PongLayer::resetGame()
+{
+    m_state = GameState{};
+    resetBall(m_state, 1.0F);
+    m_aiP1 = AiState{};
+    m_aiP2 = AiState{};
+    m_prevState = GameState{};
+}
+
+// ── ImGui overlay ────────────────────────────────────────────────────────────
+
+void PongLayer::renderImGui()
+{
+    const ImGuiViewport *vp = ImGui::GetMainViewport();
+    const ImVec2 center{vp->WorkPos.x + vp->WorkSize.x * 0.5F, vp->WorkPos.y + vp->WorkSize.y * 0.5F};
+
+    // Always show score
+    {
+        ImGui::SetNextWindowPos({center.x, vp->WorkPos.y + 10.0F}, ImGuiCond_Always, {0.5F, 0.0F});
+        ImGui::SetNextWindowBgAlpha(0.0F);
+        ImGui::Begin("Score", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
+
+        GameState displayState = m_state;
+        if (m_role == Role::Client) {
+            flipPerspective(displayState);
+        }
+        ImGui::Text("%d  :  %d", displayState.m_score1, displayState.m_score2);
+        ImGui::End();
+    }
+
+    // Phase-specific overlay
+    if (m_phase == Phase::Ready) {
+        ImGui::SetNextWindowPos(center, ImGuiCond_Always, {0.5F, 0.5F});
+        ImGui::SetNextWindowBgAlpha(0.6F);
+        ImGui::Begin("Ready", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
+        ImGui::Text("PONG");
+        ImGui::Separator();
+        ImGui::Text("W/S or Up/Down to move");
+        if (m_gamepadSlot >= 0) {
+            ImGui::Text("D-pad / Left Stick to move");
+            ImGui::Text("Press A or START to begin");
+        } else {
+            ImGui::Text("Press SPACE to start");
+        }
+        ImGui::End();
+    } else if (m_phase == Phase::GameOver) {
+        ImGui::SetNextWindowPos(center, ImGuiCond_Always, {0.5F, 0.5F});
+        ImGui::SetNextWindowBgAlpha(0.6F);
+        ImGui::Begin("GameOver",
+                     nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
+
+        GameState displayState = m_state;
+        if (m_role == Role::Client) {
+            flipPerspective(displayState);
+        }
+        if (displayState.m_score1 >= static_cast<qint32>(kMaxScore)) {
+            ImGui::Text("PLAYER 1 WINS!");
+        } else {
+            ImGui::Text("PLAYER 2 WINS!");
+        }
+        ImGui::Text("Score: %d - %d", displayState.m_score1, displayState.m_score2);
+        ImGui::Separator();
+        if (m_gamepadSlot >= 0) {
+            ImGui::Text("Press A or START to restart");
+        } else {
+            ImGui::Text("Press SPACE to restart");
+        }
+        ImGui::End();
     }
 }
 
@@ -135,18 +243,55 @@ void PongLayer::sendState()
 void PongLayer::clientUpdate()
 {
     m_socket->writeDatagram(serialize(InputPacket{localDir()}), m_hostAddress, kHostPort);
+
+    // Detect events by comparing current and previous state snapshots.
+    if (m_state.m_score1 != m_prevState.m_score1 || m_state.m_score2 != m_prevState.m_score2) {
+        playScore();
+    } else {
+        // Ball position jump heuristic: if the ball moved more than half the
+        // field in one snapshot, it likely bounced off a paddle or wall.
+        const float dx = m_state.m_ball.m_x - m_prevState.m_ball.m_x;
+        const float dy = m_state.m_ball.m_y - m_prevState.m_ball.m_y;
+        if ((dx * dx + dy * dy) > 0.04F) {
+            playHit();
+        }
+    }
+    m_prevState = m_state;
 }
 
 // ── Shared ───────────────────────────────────────────────────────────────────
 
 Direction PongLayer::localDir() const
 {
+    // Keyboard
     if (m_window.isKeyPressed(engine::Key::W) || m_window.isKeyPressed(engine::Key::Up)) {
         return Direction::Up;
     }
     if (m_window.isKeyPressed(engine::Key::S) || m_window.isKeyPressed(engine::Key::Down)) {
         return Direction::Down;
     }
+
+    // Gamepad (use cached slot from onUpdate)
+    if (m_gamepadSlot >= 0) {
+        // D-pad
+        if (m_window.isGamepadButtonPressed(engine::GamepadButton::DpadUp, m_gamepadSlot)) {
+            return Direction::Up;
+        }
+        if (m_window.isGamepadButtonPressed(engine::GamepadButton::DpadDown, m_gamepadSlot)) {
+            return Direction::Down;
+        }
+
+        // Left stick (with dead zone)
+        static constexpr float kStickDeadZone = 0.3F;
+        const float stickY = m_window.gamepadAxis(engine::GamepadAxis::LeftY, m_gamepadSlot);
+        if (stickY < -kStickDeadZone) {
+            return Direction::Up;
+        }
+        if (stickY > kStickDeadZone) {
+            return Direction::Down;
+        }
+    }
+
     return Direction::Idle;
 }
 
@@ -158,10 +303,8 @@ void PongLayer::onReadyRead()
         if (m_role == Role::Host) {
             if (!m_clientConnected) {
                 m_clientConnected = true;
-                m_state = GameState{};
-                resetBall(m_state, 1.0F);
-                m_aiP1 = AiState{};
-                m_aiP2 = AiState{};
+                resetGame();
+                m_phase = Phase::Playing;
             }
             m_clientAddress = dg.senderAddress();
             m_clientPort = static_cast<quint16>(dg.senderPort());

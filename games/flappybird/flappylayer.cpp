@@ -68,6 +68,9 @@ void FlappyLayer::onAttach()
         m_pipeState[static_cast<std::size_t>(i)].x = kWorldW + static_cast<float>(i) * kPipeSpacing;
         m_pipeState[static_cast<std::size_t>(i)].gapCenterY = dist(m_rng);
     }
+
+    // Load persisted high score
+    m_hiScore = m_settings.value(QStringLiteral("hiScore"), 0).toInt();
 }
 
 void FlappyLayer::onDetach()
@@ -81,13 +84,23 @@ void FlappyLayer::onDetach()
 
 void FlappyLayer::onUpdate(float dt)
 {
-    // Input edge detection
-    const bool spaceDown = m_window.isKeyPressed(engine::Key::Space);
+    // Discover the first connected gamepad (slot may change at runtime)
+    m_gamepadSlot = m_window.firstGamepadSlot();
+
+    // Input edge detection — Space / gamepad A / gamepad Start
+    bool spaceDown = m_window.isKeyPressed(engine::Key::Space);
+    if (m_gamepadSlot >= 0) {
+        spaceDown = spaceDown || m_window.isGamepadButtonPressed(engine::GamepadButton::A, m_gamepadSlot)
+            || m_window.isGamepadButtonPressed(engine::GamepadButton::Start, m_gamepadSlot);
+    }
     const bool spacePressed = spaceDown && !m_spaceWasPressed;
     m_spaceWasPressed = spaceDown;
 
-    // AI toggle — A key edge detection
-    const bool aDown = m_window.isKeyPressed(engine::Key::A);
+    // AI toggle — A key / gamepad Y edge detection
+    bool aDown = m_window.isKeyPressed(engine::Key::A);
+    if (m_gamepadSlot >= 0) {
+        aDown = aDown || m_window.isGamepadButtonPressed(engine::GamepadButton::Y, m_gamepadSlot);
+    }
     const bool aPressed = aDown && !m_aWasPressed;
     m_aWasPressed = aDown;
     if (aPressed) {
@@ -116,6 +129,12 @@ void FlappyLayer::onUpdate(float dt)
         m_baseOffset += kPipeSpeed * dt;
         if (m_baseOffset >= kBaseW) {
             m_baseOffset -= kBaseW;
+        }
+
+        // Background parallax scroll (slower than foreground)
+        m_bgOffset += kBgScrollSpeed * dt;
+        if (m_bgOffset >= kWorldW) {
+            m_bgOffset -= kWorldW;
         }
     }
 
@@ -156,6 +175,13 @@ void FlappyLayer::onUpdate(float dt)
         if (checkCollisions(kBirdX, m_birdY, m_pipeState)) {
             m_phase = GamePhase::GameOver;
             m_gameOverTimer = 0.F;
+
+            // Update and persist high score
+            if (m_score > m_hiScore) {
+                m_hiScore = m_score;
+                m_settings.setValue(QStringLiteral("hiScore"), m_hiScore);
+            }
+
             if (m_hitClip) {
                 m_hitClip->play();
             }
@@ -219,7 +245,7 @@ void FlappyLayer::onUpdate(float dt)
         m_entities.pipes[static_cast<std::size_t>(i)].gapCenterY = m_pipeState[static_cast<std::size_t>(i)].gapCenterY;
     }
 
-    syncFlappyScene(m_entities, m_textures, m_birdY, birdRotation(m_birdVy), m_birdFrame, m_baseOffset, m_phase, m_score);
+    syncFlappyScene(m_entities, m_textures, m_birdY, birdRotation(m_birdVy), m_birdFrame, m_baseOffset, m_bgOffset, m_phase, m_score, m_hiScore);
 }
 
 void FlappyLayer::onRender()

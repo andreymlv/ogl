@@ -4,6 +4,10 @@
 #include "components.h"
 #include "renderer2d.h"
 
+#include <QLoggingCategory>
+
+#include "engine_logging.h"
+
 #include <algorithm>
 #include <vector>
 
@@ -23,19 +27,25 @@ public:
 Scene::Scene()
     : d(std::make_unique<ScenePrivate>())
 {
+    qCDebug(Engine) << "Scene created";
 }
 
-Scene::~Scene() = default;
+Scene::~Scene()
+{
+    qCDebug(Engine) << "Scene destroyed";
+}
 
 Entity Scene::createEntity(const std::string &name)
 {
     Entity entity{d->m_registry.create(), this};
     entity.addComponent<Tag>(name);
+    qCDebug(Engine) << "Entity created:" << name.c_str() << "handle =" << static_cast<int>(entity.handle());
     return entity;
 }
 
 void Scene::destroyEntity(Entity entity)
 {
+    qCDebug(Engine) << "Entity destroyed: handle =" << static_cast<int>(entity.handle());
     d->m_registry.destroy(entity.handle());
 }
 
