@@ -10,9 +10,12 @@ namespace engine
 // in GlfwWindow, while keeping GLFW out of this header.
 enum class Key {
     A = 65,
+    D = 68,
     Space = 32,
     W = 87,
     S = 83,
+    Left = 263,
+    Right = 262,
     Up = 265,
     Down = 264,
     Escape = 256,
