@@ -1,13 +1,12 @@
 #pragma once
 
 #include "constants.h"
-#include "onnxinference.h"
 #include "physics.h"
+#include "policyweights.h"
 
 #include <array>
 
-inline std::array<float, 5> mlComputeInputs(float birdY, float birdVy,
-                                              const std::array<PipeState, kPipeCount> &pipes)
+inline std::array<float, 5> mlComputeInputs(float birdY, float birdVy, const std::array<PipeState, kPipeCount> &pipes)
 {
     // Find next pipe (same logic as aiTargetY)
     const float birdRight = kBirdX + kBirdW;
@@ -35,8 +34,7 @@ inline std::array<float, 5> mlComputeInputs(float birdY, float birdVy,
     }};
 }
 
-inline bool mlShouldFlap(OnnxInference &model, float birdY, float birdVy,
-                          const std::array<PipeState, kPipeCount> &pipes)
+inline bool mlShouldFlap(float birdY, float birdVy, const std::array<PipeState, kPipeCount> &pipes)
 {
-    return model.predict(mlComputeInputs(birdY, birdVy, pipes)) > 0.5F;
+    return policy::predict(mlComputeInputs(birdY, birdVy, pipes)) > 0.5F;
 }

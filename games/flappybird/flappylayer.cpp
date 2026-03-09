@@ -32,8 +32,7 @@ std::unique_ptr<engine::AudioClip> FlappyLayer::loadAudio(const QString &name)
         return nullptr;
     }
     const QByteArray data = file.readAll();
-    return m_audio.createSoundFromData({reinterpret_cast<const unsigned char *>(data.constData()),
-                                        static_cast<std::size_t>(data.size())});
+    return m_audio.createSoundFromData({reinterpret_cast<const unsigned char *>(data.constData()), static_cast<std::size_t>(data.size())});
 }
 
 void FlappyLayer::onAttach()
@@ -50,8 +49,7 @@ void FlappyLayer::onAttach()
     m_textures.message = loadTexture(QStringLiteral("sprites/message.png"));
     m_textures.gameover = loadTexture(QStringLiteral("sprites/gameover.png"));
     for (int i = 0; i < 10; ++i) {
-        m_textures.digitTex[static_cast<std::size_t>(i)] =
-            loadTexture(QStringLiteral("sprites/%1.png").arg(i));
+        m_textures.digitTex[static_cast<std::size_t>(i)] = loadTexture(QStringLiteral("sprites/%1.png").arg(i));
     }
 
     // Load audio clips from embedded Qt resources
@@ -60,14 +58,6 @@ void FlappyLayer::onAttach()
     m_hitClip = loadAudio(QStringLiteral("audio/hit.wav"));
     m_dieClip = loadAudio(QStringLiteral("audio/die.wav"));
     m_swooshClip = loadAudio(QStringLiteral("audio/swoosh.wav"));
-
-    // Load ML model from embedded Qt resource
-    QFile modelFile(QStringLiteral(":/model.onnx"));
-    if (modelFile.open(QIODevice::ReadOnly)) {
-        const QByteArray modelData = modelFile.readAll();
-        m_mlModel.initFromData(reinterpret_cast<const unsigned char *>(modelData.constData()),
-                               static_cast<std::size_t>(modelData.size()));
-    }
 
     // Build scene
     m_entities = buildFlappyScene(m_scene, m_textures);
@@ -106,7 +96,7 @@ void FlappyLayer::onUpdate(float dt)
             m_aiMode = AiMode::Heuristic;
             break;
         case AiMode::Heuristic:
-            m_aiMode = m_mlModel.isValid() ? AiMode::ML : AiMode::Off;
+            m_aiMode = AiMode::ML;
             break;
         case AiMode::ML:
             m_aiMode = AiMode::Off;
@@ -177,8 +167,8 @@ void FlappyLayer::onUpdate(float dt)
         bool aiFlap = false;
         if (m_aiMode == AiMode::Heuristic) {
             aiFlap = aiShouldFlap(m_birdY, m_birdVy, m_pipeState);
-        } else if (m_aiMode == AiMode::ML && m_mlModel.isValid()) {
-            aiFlap = mlShouldFlap(m_mlModel, m_birdY, m_birdVy, m_pipeState);
+        } else if (m_aiMode == AiMode::ML) {
+            aiFlap = mlShouldFlap(m_birdY, m_birdVy, m_pipeState);
         }
         if (spacePressed || aiFlap) {
             flap(m_birdVy);
@@ -229,9 +219,7 @@ void FlappyLayer::onUpdate(float dt)
         m_entities.pipes[static_cast<std::size_t>(i)].gapCenterY = m_pipeState[static_cast<std::size_t>(i)].gapCenterY;
     }
 
-    syncFlappyScene(m_entities, m_textures,
-                    m_birdY, birdRotation(m_birdVy), m_birdFrame,
-                    m_baseOffset, m_phase, m_score);
+    syncFlappyScene(m_entities, m_textures, m_birdY, birdRotation(m_birdVy), m_birdFrame, m_baseOffset, m_phase, m_score);
 }
 
 void FlappyLayer::onRender()

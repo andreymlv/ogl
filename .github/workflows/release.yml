@@ -161,8 +161,7 @@ jobs:
             autoconf autoconf-archive automake libtool \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             wayland-dev wayland-protocols-dev libxkbcommon-dev \
-            mesa-dev perl bash ccache mold \
-            libexecinfo-dev libexecinfo-static
+            mesa-dev perl bash ccache mold
           pip install --break-system-packages cmake
 
       - uses: actions/checkout@v6

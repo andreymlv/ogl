@@ -9,8 +9,7 @@
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-        "VCPKG_INSTALL_OPTIONS": "--no-print-usage",
-        "VCPKG_OVERLAY_PORTS": "$env{PROJECT_SOURCE_DIR}/meta/vcpkg-overlay-ports"
+        "VCPKG_INSTALL_OPTIONS": "--no-print-usage"
       },
       "environment": {
         "PROJECT_SOURCE_DIR": "${fileDir}/../..",
