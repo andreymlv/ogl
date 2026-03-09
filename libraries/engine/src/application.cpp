@@ -133,7 +133,7 @@ void Application::tick()
 
     d->m_window->pollEvents();
 
-    const float dt = static_cast<float>(d->m_frameTimer.elapsed()) / 1000.0F;
+    const float dt = static_cast<float>(d->m_frameTimer.nsecsElapsed()) / 1.0e9F;
     d->m_frameTimer.restart();
 
     onUpdate(dt);

@@ -84,6 +84,7 @@ bool GlfwWindow::init(int width, int height, std::string_view title)
     }
 
     glfwMakeContextCurrent(d->m_handle.get());
+    glfwSwapInterval(0);
     glfwSetWindowUserPointer(d->m_handle.get(), d.get());
 
     glfwSetFramebufferSizeCallback(d->m_handle.get(), [](GLFWwindow *w, int newWidth, int newHeight) {
